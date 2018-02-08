@@ -1,0 +1,116 @@
+From 73659fb95356d066b9b5a356e236ff7b55c57ebf Mon Sep 17 00:00:00 2001
+From: Dongli Zhang <dongli.zhang@oracle.com>
+Date: Wed, 31 Jan 2018 14:26:23 +0800
+Subject: [PATCH 1/1] hmp: add 'ept-dump' command to qemu monitor
+
+This patch is for qemu-2.11.0. API KVM_EPT_DUMP is added.
+
+Signed-off-by: Dongli Zhang <dongli.zhang@oracle.com>
+---
+ accel/kvm/kvm-all.c       |  6 ++++++
+ hmp-commands.hx           | 14 ++++++++++++++
+ hmp.c                     |  8 ++++++++
+ hmp.h                     |  1 +
+ include/sysemu/kvm.h      |  5 +++++
+ linux-headers/linux/kvm.h |  2 ++
+ 6 files changed, 36 insertions(+)
+
+diff --git a/accel/kvm/kvm-all.c b/accel/kvm/kvm-all.c
+index f290f48..94d5d33 100644
+--- a/accel/kvm/kvm-all.c
++++ b/accel/kvm/kvm-all.c
+@@ -2072,6 +2072,12 @@ int kvm_device_ioctl(int fd, int type, ...)
+     return ret;
+ }
+ 
++void kvm_ept_dump(void)
++{
++	struct KVMState *ks = kvm_state;
++	kvm_vm_ioctl(ks, KVM_EPT_DUMP);
++}
++
+ int kvm_vm_check_attr(KVMState *s, uint32_t group, uint64_t attr)
+ {
+     int ret;
+diff --git a/hmp-commands.hx b/hmp-commands.hx
+index 4afd57c..2eaf45c 100644
+--- a/hmp-commands.hx
++++ b/hmp-commands.hx
+@@ -10,6 +10,20 @@ STEXI
+ ETEXI
+ 
+     {
++        .name       = "ept-dump",
++        .args_type  = "",
++        .params     = "",
++        .help       = "dump the ept table",
++        .cmd        = hmp_ept_dump,
++    },
++
++STEXI
++@item ept-dump
++@findex ept-dump
++dump the ept table
++ETEXI
++
++    {
+         .name       = "help|?",
+         .args_type  = "name:S?",
+         .params     = "[cmd]",
+diff --git a/hmp.c b/hmp.c
+index 35a7041..9b4225e 100644
+--- a/hmp.c
++++ b/hmp.c
+@@ -2918,3 +2918,11 @@ void hmp_info_memory_size_summary(Monitor *mon, const QDict *qdict)
+     }
+     hmp_handle_error(mon, &err);
+ }
++
++extern void kvm_ept_dump(void);
++
++void hmp_ept_dump(Monitor *mon, const QDict *qdict)
++{
++	kvm_ept_dump();
++	monitor_printf(mon, "EPT table is dumped in syslog\n");
++}
+diff --git a/hmp.h b/hmp.h
+index a6f56b1..0d15326 100644
+--- a/hmp.h
++++ b/hmp.h
+@@ -147,5 +147,6 @@ void hmp_info_ramblock(Monitor *mon, const QDict *qdict);
+ void hmp_hotpluggable_cpus(Monitor *mon, const QDict *qdict);
+ void hmp_info_vm_generation_id(Monitor *mon, const QDict *qdict);
+ void hmp_info_memory_size_summary(Monitor *mon, const QDict *qdict);
++void hmp_ept_dump(Monitor *mon, const QDict *qdict);
+ 
+ #endif
+diff --git a/include/sysemu/kvm.h b/include/sysemu/kvm.h
+index bbf12a1..84815ad 100644
+--- a/include/sysemu/kvm.h
++++ b/include/sysemu/kvm.h
+@@ -268,6 +268,11 @@ int kvm_vcpu_ioctl(CPUState *cpu, int type, ...);
+ int kvm_device_ioctl(int fd, int type, ...);
+ 
+ /**
++ * kvm_ept_dump - dump ept table in kvm
++ */
++void kvm_ept_dump(void);
++
++/**
+  * kvm_vm_check_attr - check for existence of a specific vm attribute
+  * @s: The KVMState pointer
+  * @group: the group
+diff --git a/linux-headers/linux/kvm.h b/linux-headers/linux/kvm.h
+index dd8a918..f6fac78 100644
+--- a/linux-headers/linux/kvm.h
++++ b/linux-headers/linux/kvm.h
+@@ -1417,4 +1417,6 @@ struct kvm_assigned_msix_entry {
+ #define KVM_ARM_DEV_EL1_PTIMER		(1 << 1)
+ #define KVM_ARM_DEV_PMU			(1 << 2)
+ 
++#define KVM_EPT_DUMP _IO(KVMIO, 0x55)
++
+ #endif /* __LINUX_KVM_H */
+-- 
+2.7.4
+

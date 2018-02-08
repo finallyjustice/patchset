@@ -1,0 +1,115 @@
+From e4dbf946832ccb8c85e9c518f6415b65c0330f99 Mon Sep 17 00:00:00 2001
+From: Dongli Zhang <dongli.zhang@oracle.com>
+Date: Wed, 31 Jan 2018 16:05:56 +0800
+Subject: [PATCH 1/1] kvm: add KVM_EPT_DUMP to dump ept table
+
+This patch is for Ubuntu-4.4.0-45.66.
+
+Signed-off-by: Dongli Zhang <dongli.zhang@oracle.com>
+---
+ arch/x86/kvm/mmu.c       | 50 ++++++++++++++++++++++++++++++++++++++++++++++++
+ include/linux/kvm_host.h |  2 ++
+ include/uapi/linux/kvm.h |  2 ++
+ virt/kvm/kvm_main.c      |  3 +++
+ 4 files changed, 57 insertions(+)
+
+diff --git a/arch/x86/kvm/mmu.c b/arch/x86/kvm/mmu.c
+index 8eb8a93..72626e6 100644
+--- a/arch/x86/kvm/mmu.c
++++ b/arch/x86/kvm/mmu.c
+@@ -4958,6 +4958,56 @@ unsigned int kvm_mmu_calculate_mmu_pages(struct kvm *kvm)
+ 	return nr_mmu_pages;
+ }
+ 
++void kvm_ept_dump(struct kvm *kvm)
++{
++	struct kvm_vcpu *vcpu0 = kvm->vcpus[0];
++	u64 *ept_l4_base;
++	u64 *ept_l3_base;
++	u64 *ept_l2_base;
++	u64 *ept_l1_base;
++	int c4, c3, c2, c1;
++	bool is_large;
++
++	spin_lock(&kvm->mmu_lock);
++	ept_l4_base = __va(vcpu0->arch.mmu.root_hpa);
++
++	pr_alert("dump ept table:\n");
++	pr_alert("eptp=0x%016llx\n", vcpu0->arch.mmu.root_hpa);
++	
++	for (c4 = 0; c4 < PT64_ENT_PER_PAGE; c4++) {
++		if (is_shadow_present_pte(ept_l4_base[c4])) {
++			pr_alert("  plm4e[%d] = 0x%016llx\n", c4, ept_l4_base[c4]);
++			ept_l3_base = __va(ept_l4_base[c4] & PT64_BASE_ADDR_MASK);
++		
++			for (c3 = 0; c3 < PT64_ENT_PER_PAGE; c3++) {
++				if (is_shadow_present_pte(ept_l3_base[c3])) {
++					pr_alert("    pdpte[%d] = 0x%016llx\n", c3, ept_l3_base[c3]);
++					ept_l2_base = __va(ept_l3_base[c3] & PT64_BASE_ADDR_MASK);
++
++					for (c2 = 0; c2 < PT64_ENT_PER_PAGE; c2++) {
++						is_large = is_large_pte(ept_l2_base[c2]) ? true : false;
++						if (is_shadow_present_pte(ept_l2_base[c2])) {
++							pr_alert("      pde[%d] = 0x%016llx (2M=%d)\n",
++									c2, ept_l2_base[c2], is_large);
++
++							if (!is_large) {
++								ept_l1_base = __va(ept_l2_base[c2] & PT64_BASE_ADDR_MASK);
++
++								for (c1 = 0; c1 < PT64_ENT_PER_PAGE; c1++) {
++									if (is_shadow_present_pte(ept_l1_base[c1]))
++										pr_alert("        pte[%d] = 0x%016llx\n", c1, ept_l1_base[c1]);
++								}
++							}
++						}
++					}
++				}
++			}
++		}
++	}
++	
++	spin_unlock(&kvm->mmu_lock);
++}
++
+ void kvm_mmu_destroy(struct kvm_vcpu *vcpu)
+ {
+ 	kvm_mmu_unload(vcpu);
+diff --git a/include/linux/kvm_host.h b/include/linux/kvm_host.h
+index 9e79145..e8536e9 100644
+--- a/include/linux/kvm_host.h
++++ b/include/linux/kvm_host.h
+@@ -1205,4 +1205,6 @@ int kvm_arch_update_irqfd_routing(struct kvm *kvm, unsigned int host_irq,
+ 				  uint32_t guest_irq, bool set);
+ #endif /* CONFIG_HAVE_KVM_IRQ_BYPASS */
+ 
++void kvm_ept_dump(struct kvm *kvm);
++
+ #endif
+diff --git a/include/uapi/linux/kvm.h b/include/uapi/linux/kvm.h
+index 6e32f75..8c79178 100644
+--- a/include/uapi/linux/kvm.h
++++ b/include/uapi/linux/kvm.h
+@@ -1294,4 +1294,6 @@ struct kvm_assigned_msix_entry {
+ 	__u16 padding[3];
+ };
+ 
++#define KVM_EPT_DUMP _IO(KVMIO, 0x55)
++
+ #endif /* __LINUX_KVM_H */
+diff --git a/virt/kvm/kvm_main.c b/virt/kvm/kvm_main.c
+index 336ed26..8e87825 100644
+--- a/virt/kvm/kvm_main.c
++++ b/virt/kvm/kvm_main.c
+@@ -2904,6 +2904,9 @@ out_free_irq_routing:
+ 	case KVM_CHECK_EXTENSION:
+ 		r = kvm_vm_ioctl_check_extension_generic(kvm, arg);
+ 		break;
++	case KVM_EPT_DUMP:
++		kvm_ept_dump(kvm);
++		r = 0;
+ 	default:
+ 		r = kvm_arch_vm_ioctl(filp, ioctl, arg);
+ 	}
+-- 
+2.7.4
+
