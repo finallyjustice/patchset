@@ -1,0 +1,296 @@
+From 39860cebb513a5f8cab8281b6f7966f4fcfe0b78 Mon Sep 17 00:00:00 2001
+From: Dongli Zhang <dongli.zhang@oracle.com>
+Date: Mon, 5 Mar 2018 19:38:28 +0800
+Subject: [PATCH 1/1] net: hold and not free a skb to reproduce the xenwatch
+ stall
+
+This patch is based on 4.16-rc4 at commit 661e50bc85.
+
+This patch is used to hold on a sk_buff (with fragments) sent out from
+vifX.Y on xen dom0, so that the corresponding vifX.Y would not disconnect
+successfully. As a result, xenwatch is stalled unless the inflight sk_buff
+is reclaimed. It is not possible to create or destroy during xenwatch hang.
+
+Here is how to use the patch (I have tested it with xen-4.11-unstable on
+ubuntu 16.04):
+
+1. specify the vif interface to introduce the issue:
+# echo vif1.0 > /sys/kernel/xwstall/vifname
+[  360.673107] xwstall: set vifname=vif1.0
+
+2. introduce the issue by hold on a sk_buff for the vif interface:
+# echo 1 > /sys/kernel/xwstall/eavesdrop
+[  424.594409] xwstall: hold sk_buff=0xffff88011a12a000 at netdev=vif1.0 (nr_frag=2)
+[  424.594494] xwstall: grant(0) domid=1 gref=13
+[  424.594531] xwstall: grant(1) domid=1 gref=28
+
+3. it is not possible to destroy the guest with issue now:
+# xl destroy 1
+libxl: error: libxl_device.c:1080:device_backend_callback: Domain 1:unable to remove device with path /local/domain/0/backend/vif/1/0
+libxl: error: libxl_domain.c:1073:devices_destroy_cb: Domain 1:libxl__devices_destroy failed
+
+The guest could not be destroyed total as show below:
+
+root@test1:/home/zhang/img/ubuntu1604# xl list
+Name                                        ID   Mem VCPUs	State	Time(s)
+Domain-0                                     0  2879     4     r-----      13.2
+(null)                                       1     0     1     --p--d       7.0
+
+
+tx_zerocopy_success+tx_zerocopy_fail is not equal to tx_zerocopy_sent:
+# ethtool -S vif1.0
+NIC statistics:
+     rx_gso_checksum_fixup: 0
+     tx_zerocopy_sent: 120
+     tx_zerocopy_success: 0
+     tx_zerocopy_fail: 119
+     tx_frag_overflow: 0
+
+xenwatch kernel thread is stalled in 'D' state:
+# cat /proc/39/stack
+[<0>] kthread_stop+0x3e/0x100
+[<0>] xenvif_disconnect_data+0x74/0xf0 [xen_netback]
+[<0>] set_backend_state+0x15b/0xcf0 [xen_netback]
+[<0>] frontend_changed+0x49/0xa0 [xen_netback]
+[<0>] xenwatch_thread+0xa5/0x150
+[<0>] kthread+0xf3/0x130
+[<0>] ret_from_fork+0x35/0x40
+[<0>] 0xffffffffffffffff
+
+4. it is not possible to create new guest yet:
+root@test1:/home/zhang/img/oel6# xl create pv.cfg 
+Parsing config from pv.cfg
+libxl: error: libxl_device.c:1080:device_backend_callback: Domain 2:unable to add device with path /local/domain/0/backend/vbd/2/51712
+libxl: error: libxl_create.c:1278:domcreate_launch_dm: Domain 2:unable to add disk devices
+libxl: error: libxl_device.c:1080:device_backend_callback: Domain 2:unable to remove device with path /local/domain/0/backend/vbd/2/51712
+libxl: error: libxl_domain.c:1073:devices_destroy_cb: Domain 2:libxl__devices_destroy failed
+libxl: error: libxl_domain.c:1000:libxl__destroy_domid: Domain 2:Non-existant domain
+libxl: error: libxl_domain.c:959:domain_destroy_callback: Domain 2:Unable to destroy guest
+libxl: error: libxl_domain.c:886:domain_destroy_cb: Domain 2:Destruction of domain failed
+
+5. flush and reclaim the sk_buff on-hold and everything goes back to normal
+# echo 0 > /sys/kernel/xwstall/eavesdrop
+[  692.414539] xwstall: flush the on-hold sk_buff
+[  692.414585] xwstall: reset eavesdrop and skb_onhold
+
+
+Signed-off-by: Dongli Zhang <dongli.zhang@oracle.com>
+---
+ net/core/dev.c | 180 +++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+ 1 file changed, 180 insertions(+)
+
+diff --git a/net/core/dev.c b/net/core/dev.c
+index d4362be..42a3811 100644
+--- a/net/core/dev.c
++++ b/net/core/dev.c
+@@ -146,6 +146,7 @@
+ #include <linux/sctp.h>
+ #include <net/udp_tunnel.h>
+ #include <linux/net_namespace.h>
++#include <xen/grant_table.h>
+ 
+ #include "net-sysfs.h"
+ 
+@@ -4695,6 +4696,178 @@ static int netif_receive_skb_internal(struct sk_buff *skb)
+ 	return ret;
+ }
+ 
++static struct kobject *xwstall_kobj;
++static int eavesdrop;
++static char vifname[IFNAMSIZ];
++static struct sk_buff *skb_onhold;
++spinlock_t xwstall_lock;
++
++static ssize_t
++eavesdrop_show(struct kobject *kobj,
++	       struct kobj_attribute *attr,
++	       char *buf)
++{
++	return sprintf(buf, "%d\n", eavesdrop);
++}
++
++static ssize_t
++eavesdrop_store(struct kobject *kobj,
++		struct kobj_attribute *attr,
++		const char *buf, size_t count)
++{
++	int val;
++
++	sscanf(buf, "%d", &val);
++
++	spin_lock_bh(&xwstall_lock);
++
++	switch (val) {
++	case 0:
++		if (eavesdrop && skb_onhold) {
++			dev_kfree_skb_any(skb_onhold);
++			pr_alert("xwstall: flush the on-hold sk_buff\n");
++		}
++
++		eavesdrop = 0;
++		skb_onhold = NULL;
++		pr_alert("xwstall: reset eavesdrop and skb_onhold\n");
++		break;
++
++	case 1:
++		if (!eavesdrop)
++			pr_alert("xwstall: enable eavesdrop on %s\n", vifname);
++		else
++			pr_alert("xwstall: eavesdrop is already enabled on %s\n",
++				 vifname);
++
++		eavesdrop = 1;
++		break;
++
++	default:
++		pr_alert("xwstall: eavesdrop does not support %d\n", eavesdrop);
++		return -EINVAL;
++	}
++
++	spin_unlock_bh(&xwstall_lock);
++
++	return count;
++}
++
++static ssize_t
++vifname_show(struct kobject *kobj,
++	     struct kobj_attribute *attr,
++	     char *buf)
++{
++	return sprintf(buf, "%s", vifname);
++}
++
++static ssize_t
++vifname_store(struct kobject *kobj,
++	      struct kobj_attribute *attr,
++	      const char *buf, size_t count)
++{
++	if (strlen(buf) >= IFNAMSIZ)
++		return -EINVAL;
++
++	spin_lock_bh(&xwstall_lock);
++	snprintf(vifname, IFNAMSIZ - 1, "%s", buf);
++	pr_alert("xwstall: set vifname=%s\n", vifname);
++	spin_unlock_bh(&xwstall_lock);
++
++	return count;
++}
++
++static struct kobj_attribute eavesdrop_attr =
++	    __ATTR(eavesdrop, 0600,
++		   eavesdrop_show,
++		   eavesdrop_store);
++
++static struct kobj_attribute vifname_attr =
++	    __ATTR(vifname, 0600,
++		   vifname_show,
++		   vifname_store);
++
++static void xwstall_register_sysfs(void)
++{
++	int ret;
++
++	/* create a directory into the /sys/kernel directory */
++	xwstall_kobj = kobject_create_and_add("xwstall", kernel_kobj);
++	if (!xwstall_kobj)
++		goto xwstall_out;
++
++	/* create a single file attribute */
++	ret = sysfs_create_file(xwstall_kobj, &eavesdrop_attr.attr);
++	if (ret)
++		goto eavesdrop_out;
++
++	ret = sysfs_create_file(xwstall_kobj, &vifname_attr.attr);
++	if (ret)
++		goto vifname_out;
++
++	spin_lock_init(&xwstall_lock);
++	pr_alert("xwstall: xwstall sysfs is created successfully\n");
++
++	return;
++
++vifname_out:
++	pr_alert("xwstall: failed to create vifname file");
++	sysfs_remove_file(xwstall_kobj, &eavesdrop_attr.attr);
++eavesdrop_out:
++	pr_alert("xwstall: failed to create eavesdrop file\n");
++	kobject_put(xwstall_kobj);
++xwstall_out:
++	pr_alert("xwstall: failed to create xwstall_kobj\n");
++}
++
++static int eavesdrop_skb(struct sk_buff *skb)
++{
++	struct xen_page_foreign *foreign;
++	struct page *vif_page;
++	int i, ret = 0;
++
++	spin_lock_bh(&xwstall_lock);
++
++	if (skb_onhold)
++		goto exit;
++
++	if (!(skb_shinfo(skb)->tx_flags & SKBTX_DEV_ZEROCOPY))
++		goto exit;
++
++	if (!skb_shinfo(skb)->gso_size || !skb_shinfo(skb)->nr_frags)
++		goto exit;
++
++	if (!strstr(vifname, skb->dev->name))
++		goto exit;
++
++	for (i = 0; i < skb_shinfo(skb)->nr_frags; i++) {
++		vif_page = skb_shinfo(skb)->frags[i].page.p;
++		foreign = xen_page_foreign(vif_page);
++
++		if (!foreign)
++			goto exit;
++	}
++
++	pr_alert("xwstall: hold sk_buff=0x%016llx at netdev=%s (nr_frag=%d)\n",
++		 (u64)skb, skb->dev->name, skb_shinfo(skb)->nr_frags);
++
++	for (i = 0; i < skb_shinfo(skb)->nr_frags; i++) {
++		vif_page = skb_shinfo(skb)->frags[i].page.p;
++		foreign = xen_page_foreign(vif_page);
++
++		pr_alert("xwstall: grant(%d) domid=%d gref=%d\n",
++			 i, foreign->domid, foreign->gref);
++	}
++
++	skb_onhold = skb;
++	ret = 1;
++
++exit:
++	spin_unlock_bh(&xwstall_lock);
++
++	return ret;
++}
++
+ /**
+  *	netif_receive_skb - process receive buffer from network
+  *	@skb: buffer to process
+@@ -4714,6 +4887,10 @@ int netif_receive_skb(struct sk_buff *skb)
+ {
+ 	trace_netif_receive_skb_entry(skb);
+ 
++	if (unlikely(eavesdrop))
++		if (eavesdrop_skb(skb))
++			return NET_RX_SUCCESS;
++
+ 	return netif_receive_skb_internal(skb);
+ }
+ EXPORT_SYMBOL(netif_receive_skb);
+@@ -9025,6 +9202,9 @@ static int __init net_dev_init(void)
+ 				       NULL, dev_cpu_dead);
+ 	WARN_ON(rc < 0);
+ 	rc = 0;
++
++	xwstall_register_sysfs();
++
+ out:
+ 	return rc;
+ }
+-- 
+2.7.4
+
