@@ -1,0 +1,96 @@
+From 43a103d1a9fa94efd202df319e1a1af4136fc6b7 Mon Sep 17 00:00:00 2001
+From: Dongli Zhang <dongli.zhang@oracle.com>
+Date: Tue, 14 May 2019 13:13:29 +0800
+Subject: [PATCH 1/1] timer: trigger timer via pic and ioapic
+
+repo: https://github.com/finallyjustice/xv6-x86_64
+
+This is based on commit 8700f187bac4.
+
+The pic will trigger interrupt via ioapic pin2 to cpu 1.
+
+Signed-off-by: Dongli Zhang <dongli.zhang@oracle.com>
+---
+ kernel/lapic.c | 8 --------
+ kernel/main.c  | 8 ++++++--
+ kernel/timer.c | 4 ++--
+ kernel/trap.c  | 4 ++++
+ 4 files changed, 12 insertions(+), 12 deletions(-)
+
+diff --git a/kernel/lapic.c b/kernel/lapic.c
+index ada18f4..33f6b0f 100644
+--- a/kernel/lapic.c
++++ b/kernel/lapic.c
+@@ -61,14 +61,6 @@ lapicinit(void)
+   // Enable local APIC; set spurious interrupt vector.
+   lapicw(SVR, ENABLE | (T_IRQ0 + IRQ_SPURIOUS));
+ 
+-  // The timer repeatedly counts down at bus frequency
+-  // from lapic[TICR] and then issues an interrupt.  
+-  // If xv6 cared more about precise timekeeping,
+-  // TICR would be calibrated using an external time source.
+-  lapicw(TDCR, X1);
+-  lapicw(TIMER, PERIODIC | (T_IRQ0 + IRQ_TIMER));
+-  lapicw(TICR, 10000000); 
+-
+   // Disable logical interrupt lines.
+   lapicw(LINT0, MASKED);
+   lapicw(LINT1, MASKED);
+diff --git a/kernel/main.c b/kernel/main.c
+index 900b632..2441501 100644
+--- a/kernel/main.c
++++ b/kernel/main.c
+@@ -5,6 +5,7 @@
+ #include "mmu.h"
+ #include "proc.h"
+ #include "x86.h"
++#include "traps.h"
+ 
+ static void startothers(void);
+ static void mpmain(void)  __attribute__((noreturn));
+@@ -35,8 +36,11 @@ main(void)
+   fileinit();      // file table
+   iinit();         // inode cache
+   ideinit();       // disk
+-  if(!ismp)
+-    timerinit();   // uniprocessor timer
++  
++  timerinit();
++  /* pin 2 on ioapic is for pic (8253/8254) */
++  ioapicenable(2, 1);
++
+   startothers();   // start other processors
+   kinit2(P2V(4*1024*1024), P2V(PHYSTOP)); // must come after startothers()
+   userinit();      // first user process
+diff --git a/kernel/timer.c b/kernel/timer.c
+index 8df75a9..190268d 100644
+--- a/kernel/timer.c
++++ b/kernel/timer.c
+@@ -26,7 +26,7 @@ timerinit(void)
+ {
+   // Interrupt 100 times/sec.
+   outb(TIMER_MODE, TIMER_SEL0 | TIMER_RATEGEN | TIMER_16BIT);
+-  outb(IO_TIMER1, TIMER_DIV(100) % 256);
+-  outb(IO_TIMER1, TIMER_DIV(100) / 256);
++  outb(IO_TIMER1, 255);
++  outb(IO_TIMER1, 255);
+   picenable(IRQ_TIMER);
+ }
+diff --git a/kernel/trap.c b/kernel/trap.c
+index d1b37bc..bac52b4 100644
+--- a/kernel/trap.c
++++ b/kernel/trap.c
+@@ -58,6 +58,10 @@ trap(struct trapframe *tf)
+     }
+     lapiceoi();
+     break;
++  case 34:
++    cprintf("timer on cpu %d via ioapic pin2\n", cpu->id);
++    lapiceoi();
++    break;
+   case T_IRQ0 + IRQ_IDE:
+     ideintr();
+     lapiceoi();
+-- 
+2.7.4
+
