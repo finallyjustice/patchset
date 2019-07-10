@@ -1,0 +1,66 @@
+From 4bb86a06a5547261876aeb7d40ed3311175b5910 Mon Sep 17 00:00:00 2001
+From: Dongli Zhang <dongli.zhang0129@gmail.com>
+Date: Wed, 10 Jul 2019 08:58:24 +0800
+Subject: [PATCH 1/1] testsys: sysfs to debug kernel for v5.2
+
+Signed-off-by: Dongli Zhang <dongli.zhang0129@gmail.com>
+---
+ block/blk-mq.c | 38 ++++++++++++++++++++++++++++++++++++++
+ 1 file changed, 38 insertions(+)
+
+diff --git a/block/blk-mq.c b/block/blk-mq.c
+index ce0f5f4..faa0d0e 100644
+--- a/block/blk-mq.c
++++ b/block/blk-mq.c
+@@ -3542,10 +3542,48 @@ unsigned int blk_mq_rq_cpu(struct request *rq)
+ }
+ EXPORT_SYMBOL(blk_mq_rq_cpu);
+ 
++int testsys_debug = 0;
++
++static ssize_t
++testsys_show(struct kobject *kobj,
++	     struct kobj_attribute *attr,
++	     char *buf)
++{
++	return sprintf(buf, "%d\n", testsys_debug);
++}
++
++static ssize_t
++testsys_store(struct kobject *kobj,
++	      struct kobj_attribute *attr,
++	      const char *buf, size_t count)
++{
++	sscanf(buf, "%d", &testsys_debug);
++	pr_alert("testsys: testsys_debug is set to %d\n", testsys_debug);
++
++	return count;
++}
++
++static struct kobj_attribute testsys_attr =
++	__ATTR(testsys, 0600,
++	       testsys_show,
++	       testsys_store);
++
++static void testsys_register(void)
++{
++	int ret;
++
++	ret = sysfs_create_file(kernel_kobj, &testsys_attr.attr);
++	if (ret)
++		pr_alert("testsys: failed to create testsys\n");
++	else
++		pr_alert("testsys: the testsys is created successfully\n");
++}
++
+ static int __init blk_mq_init(void)
+ {
+ 	cpuhp_setup_state_multi(CPUHP_BLK_MQ_DEAD, "block/mq:dead", NULL,
+ 				blk_mq_hctx_notify_dead);
++	testsys_register();
+ 	return 0;
+ }
+ subsys_initcall(blk_mq_init);
+-- 
+2.7.4
+
