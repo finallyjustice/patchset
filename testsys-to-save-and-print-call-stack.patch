@@ -1,0 +1,118 @@
+From c86dfdbb309288b59fd1e21a43a073e1a820f75e Mon Sep 17 00:00:00 2001
+From: Dongli Zhang <dongli.zhang@oracle.com>
+Date: Thu, 11 Jul 2019 23:03:32 +0800
+Subject: [PATCH 1/1] testsys: to save and print call stack
+
+This is based on v5.2.
+
+This patch saves the call stack in testsys_register() and print the saved
+call stack when we echo 1 to /sys/kernel/testsys.
+
+The call stack is saved at blk_mq_init()-->testsys_register() during
+initialization,
+
+[    0.348266] testsys: save the current callstack...
+[    0.349243] testsys: the testsys is created successfully
+
+The saved call stack is printed ...
+
+[   36.488330] testsys: print call stack:
+[   36.489771]  testsys_register+0x35/0xa0
+[   36.489776]  blk_mq_init+0x27/0x2a
+[   36.489779]  do_one_initcall+0x48/0x1df
+[   36.489783]  kernel_init_freeable+0x17a/0x213
+[   36.489787]  kernel_init+0x5/0x100
+[   36.489789]  ret_from_fork+0x35/0x40
+[   36.489791] testsys: testsys_debug is set to 1
+
+Here is the flow to save current callstack to test_handle:
+
+depot_stack_handle_t test_handle;
+
+unsigned long entries[64];
+unsigned int nr_entries;
+nr_entries = stack_trace_save(entries, ARRAY_SIZE(entries), 0);
+test_handle = stack_depot_save(entries, nr_entries, 0);
+
+Here is the flow to print call stack saved to test_handle:
+
+unsigned long *entries;
+unsigned int nr_entries;
+nr_entries = stack_depot_fetch(test_handle, &entries);
+stack_trace_print(entries, nr_entries, 0);
+
+Signed-off-by: Dongli Zhang <dongli.zhang@oracle.com>
+---
+ block/blk-mq.c | 52 ++++++++++++++++++++++++++++++++++++++++++++++++++++
+ 1 file changed, 52 insertions(+)
+
+diff --git a/block/blk-mq.c b/block/blk-mq.c
+index ce0f5f4..3500302 100644
+--- a/block/blk-mq.c
++++ b/block/blk-mq.c
+@@ -3542,10 +3542,62 @@ unsigned int blk_mq_rq_cpu(struct request *rq)
+ }
+ EXPORT_SYMBOL(blk_mq_rq_cpu);
+ 
++int testsys_debug = 0;
++depot_stack_handle_t test_handle;
++
++static ssize_t
++testsys_show(struct kobject *kobj,
++	     struct kobj_attribute *attr,
++	     char *buf)
++{
++	return sprintf(buf, "%d\n", testsys_debug);
++}
++
++static ssize_t
++testsys_store(struct kobject *kobj,
++	      struct kobj_attribute *attr,
++	      const char *buf, size_t count)
++{
++	unsigned long *entries;
++	unsigned int nr_entries;
++
++	nr_entries = stack_depot_fetch(test_handle, &entries);
++	pr_alert("testsys: print call stack:\n");
++	stack_trace_print(entries, nr_entries, 0);
++
++	sscanf(buf, "%d", &testsys_debug);
++	pr_alert("testsys: testsys_debug is set to %d\n", testsys_debug);
++
++	return count;
++}
++
++static struct kobj_attribute testsys_attr =
++	__ATTR(testsys, 0600,
++	       testsys_show,
++	       testsys_store);
++
++void testsys_register(void)
++{
++	unsigned long entries[64];
++	unsigned int nr_entries;
++	int ret;
++
++	pr_alert("testsys: save the current callstack...\n");
++	nr_entries = stack_trace_save(entries, ARRAY_SIZE(entries), 0);
++	test_handle = stack_depot_save(entries, nr_entries, 0);
++
++	ret = sysfs_create_file(kernel_kobj, &testsys_attr.attr);
++	if (ret)
++		pr_alert("testsys: failed to create testsys\n");
++	else
++		pr_alert("testsys: the testsys is created successfully\n");
++}
++
+ static int __init blk_mq_init(void)
+ {
+ 	cpuhp_setup_state_multi(CPUHP_BLK_MQ_DEAD, "block/mq:dead", NULL,
+ 				blk_mq_hctx_notify_dead);
++	testsys_register();
+ 	return 0;
+ }
+ subsys_initcall(blk_mq_init);
+-- 
+2.7.4
+
