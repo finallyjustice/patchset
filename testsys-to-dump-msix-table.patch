@@ -1,0 +1,188 @@
+From 55f365191c712abf4af524a3cf2372b6acce860a Mon Sep 17 00:00:00 2001
+From: Dongli Zhang <dongli.zhang@oracle.com>
+Date: Mon, 19 Aug 2019 16:33:04 +0800
+Subject: [PATCH 1/1] testsys: to dump msix table
+
+This is based on v5.2 to dump msix table.
+
+I use below command line to test with qemu nvme with 16 queues (16 msix vector).
+
+-device nvme,drive=lightnvme,serial=deadbeaf1,num_queues=16
+-drive file=/home/zhang/img/test.img,if=none,id=lightnvme
+
+The result of lspci:
+
+00:04.0 Non-Volatile memory controller: Intel Corporation QEMU NVM Express Controller (rev 02) (prog-if 02 [NVM Express])
+	Subsystem: Red Hat, Inc QEMU Virtual Machine
+	... ...
+	Region 0: Memory at febf0000 (64-bit, non-prefetchable) [size=8K]
+	Region 4: Memory at febf3000 (32-bit, non-prefetchable) [size=4K]
+	Capabilities: [40] MSI-X: Enable+ Count=16 Masked-
+		Vector table: BAR=4 offset=00000000
+		PBA: BAR=4 offset=00000800
+	... ...
+	Kernel driver in use: nvme
+
+00:04.0 0108: 8086:5845 (rev 02)
+
+Please update *PCI_TEST_VENDOR* and *PCI_TEST_DEVICE* in patch.
+
+0
+[  136.300786] vendor=0x8086, device=0x5845, bar=4, offset=0x00000000, nr_entries=16:
+[  136.301714] entry 0: address_lo=0xfee01004, address_hi=00000000, data=00004022, vector_ctrl=00000000
+[  136.302960] entry 1: address_lo=0xfee01004, address_hi=00000000, data=00004021, vector_ctrl=00000000
+[  136.303995] entry 2: address_lo=0xfee02004, address_hi=00000000, data=00004022, vector_ctrl=00000000
+[  136.305065] entry 3: address_lo=0xfee04004, address_hi=00000000, data=00004022, vector_ctrl=00000000
+[  136.306250] entry 4: address_lo=0xfee08004, address_hi=00000000, data=00004022, vector_ctrl=00000000
+[  136.307365] entry 5: address_lo=0x00000000, address_hi=00000000, data=00000000, vector_ctrl=00000001
+[  136.308407] entry 6: address_lo=0x00000000, address_hi=00000000, data=00000000, vector_ctrl=00000001
+[  136.309455] entry 7: address_lo=0x00000000, address_hi=00000000, data=00000000, vector_ctrl=00000001
+[  136.310507] entry 8: address_lo=0x00000000, address_hi=00000000, data=00000000, vector_ctrl=00000001
+[  136.311554] entry 9: address_lo=0x00000000, address_hi=00000000, data=00000000, vector_ctrl=00000001
+[  136.312865] entry 10: address_lo=0x00000000, address_hi=00000000, data=00000000, vector_ctrl=00000001
+[  136.314298] entry 11: address_lo=0x00000000, address_hi=00000000, data=00000000, vector_ctrl=00000001
+[  136.315078] entry 12: address_lo=0x00000000, address_hi=00000000, data=00000000, vector_ctrl=00000001
+[  136.315820] entry 13: address_lo=0x00000000, address_hi=00000000, data=00000000, vector_ctrl=00000001
+[  136.316597] entry 14: address_lo=0x00000000, address_hi=00000000, data=00000000, vector_ctrl=00000001
+[  136.317375] entry 15: address_lo=0x00000000, address_hi=00000000, data=00000000, vector_ctrl=00000001
+
+As my VM has 4 cpu, only 5 queues (4 io queue + 1 admin queue) are used.
+
+
+This does not dump PBA.
+
+Signed-off-by: Dongli Zhang <dongli.zhang@oracle.com>
+---
+ block/blk-mq.c | 105 +++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+ 1 file changed, 105 insertions(+)
+
+diff --git a/block/blk-mq.c b/block/blk-mq.c
+index ce0f5f4..22370c8 100644
+--- a/block/blk-mq.c
++++ b/block/blk-mq.c
+@@ -26,6 +26,7 @@
+ #include <linux/delay.h>
+ #include <linux/crash_dump.h>
+ #include <linux/prefetch.h>
++#include <linux/pci.h>
+ 
+ #include <trace/events/block.h>
+ 
+@@ -3542,10 +3543,114 @@ unsigned int blk_mq_rq_cpu(struct request *rq)
+ }
+ EXPORT_SYMBOL(blk_mq_rq_cpu);
+ 
++#define PCI_TEST_VENDOR 0x8086
++#define PCI_TEST_DEVICE 0x5845
++
++#define msix_table_size(flags)  ((flags & PCI_MSIX_FLAGS_QSIZE) + 1)
++
++static void pci_dump_msix(void)
++{
++	struct pci_dev *dev = NULL;
++	u16 control;
++	unsigned nr_entries;
++	u32 table_offset;
++	u8 bir;
++	resource_size_t phys_addr;
++	void __iomem *base;
++	int i;
++
++	dev = pci_get_device(PCI_TEST_VENDOR, PCI_TEST_DEVICE, dev);
++	if (!dev) {
++		pr_alert("no device found\n");
++		return;
++	}
++
++	/*
++	 * to obtain the number of msix entries
++	 *
++	 * the msix_cap is obtained from pci capability
++	 */
++	pci_read_config_word(dev, dev->msix_cap + PCI_MSIX_FLAGS, &control);
++	nr_entries = msix_table_size(control);
++
++	/* obtain msix bar index and offset */
++	pci_read_config_dword(dev, dev->msix_cap + PCI_MSIX_TABLE,
++			      &table_offset);
++	bir = (u8)(table_offset & PCI_MSIX_TABLE_BIR);
++	table_offset &= PCI_MSIX_TABLE_OFFSET;
++
++	/* obtain physical address of msix table */
++	phys_addr = pci_resource_start(dev, bir) + table_offset;
++
++	base = ioremap_nocache(phys_addr, nr_entries * PCI_MSIX_ENTRY_SIZE);
++
++	pr_alert("vendor=0x%x, device=0x%x, bar=%d, offset=0x%08x, nr_entries=%d:\n",
++		 PCI_TEST_VENDOR, PCI_TEST_DEVICE, bir, table_offset, nr_entries);
++
++	for (i = 0; i < nr_entries; i++) {
++		u32 address_lo;
++		u32 address_hi;
++		u32 data;
++		u32 vector_ctrl;
++
++		/* the base address of msix entry i */
++		void __iomem *entry = base + i * PCI_MSIX_ENTRY_SIZE;
++
++		address_lo = readl(entry + PCI_MSIX_ENTRY_LOWER_ADDR);
++		address_hi = readl(entry + PCI_MSIX_ENTRY_UPPER_ADDR);
++		data = readl(entry + PCI_MSIX_ENTRY_DATA);
++		vector_ctrl = readl(entry + PCI_MSIX_ENTRY_VECTOR_CTRL);
++
++		pr_alert("entry %d: address_lo=0x%08x, address_hi=%08x, data=%08x, vector_ctrl=%08x\n",
++			 i, address_lo, address_hi, data, vector_ctrl);
++	}
++
++	iounmap(base);
++}
++
++int testsys_debug = 0;
++
++static ssize_t
++testsys_show(struct kobject *kobj,
++	     struct kobj_attribute *attr,
++	     char *buf)
++{
++	pci_dump_msix();
++	return sprintf(buf, "%d\n", testsys_debug);
++}
++
++static ssize_t
++testsys_store(struct kobject *kobj,
++	      struct kobj_attribute *attr,
++	      const char *buf, size_t count)
++{
++	sscanf(buf, "%d", &testsys_debug);
++	pr_alert("testsys: testsys_debug is set to %d\n", testsys_debug);
++
++	return count;
++}
++
++static struct kobj_attribute testsys_attr =
++	__ATTR(testsys, 0600,
++	       testsys_show,
++	       testsys_store);
++
++static void testsys_register(void)
++{
++	int ret;
++
++	ret = sysfs_create_file(kernel_kobj, &testsys_attr.attr);
++	if (ret)
++		pr_alert("testsys: failed to create testsys\n");
++	else
++		pr_alert("testsys: the testsys is created successfully\n");
++}
++
+ static int __init blk_mq_init(void)
+ {
+ 	cpuhp_setup_state_multi(CPUHP_BLK_MQ_DEAD, "block/mq:dead", NULL,
+ 				blk_mq_hctx_notify_dead);
++	testsys_register();
+ 	return 0;
+ }
+ subsys_initcall(blk_mq_init);
+-- 
+2.7.4
+
