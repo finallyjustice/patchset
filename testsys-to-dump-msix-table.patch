@@ -23,11 +23,14 @@ The result of lspci:
 	... ...
 	Kernel driver in use: nvme
 
+# lspci -ns 00:04.0
 00:04.0 0108: 8086:5845 (rev 02)
 
 Please update *PCI_TEST_VENDOR* and *PCI_TEST_DEVICE* in patch.
 
+# cat /sys/kernel/testsys
 0
+# dmesg
 [  136.300786] vendor=0x8086, device=0x5845, bar=4, offset=0x00000000, nr_entries=16:
 [  136.301714] entry 0: address_lo=0xfee01004, address_hi=00000000, data=00004022, vector_ctrl=00000000
 [  136.302960] entry 1: address_lo=0xfee01004, address_hi=00000000, data=00004021, vector_ctrl=00000000
