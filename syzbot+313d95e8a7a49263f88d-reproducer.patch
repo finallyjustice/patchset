@@ -1,0 +1,166 @@
+From 95733b53c0006def5c1e50fcf24fb8ffc30fef9c Mon Sep 17 00:00:00 2001
+From: Dongli Zhang <dongli.zhang@oracle.com>
+Date: Thu, 26 Mar 2020 16:27:05 -0700
+Subject: [PATCH 1/1] To reproduce syzbot+313d95e8a7a49263f88d
+
+step 1: build kernel with this patch.
+
+step 2: boot virtual machine and run "echo 1 > /sys/kernel/testsys" to
+enabled debug.
+
+step 3: add new loop device with below code:
+
+#include <stdio.h>
+#include <errno.h>
+#include <fcntl.h>
+#include <unistd.h>
+#include <sys/ioctl.h>
+
+#define LOOP_CTL_ADD 0x4C80
+
+int main(int argc, char **argv)
+{
+	int fd, err;
+
+	fd = open("/dev/loop-control", O_RDWR);
+	err = ioctl(fd, LOOP_CTL_ADD, 20);
+
+	return 0;
+}
+
+
+step4: I can hit below issue.
+
+[   28.253740] testsys: to emulate memory allocation failure
+[   28.254691] testsys: although to increase nr_hw_queues is failed, currently set->nr_hw_queues=1 while q->nr_hw_queues=1, i=0
+[   28.256583] testsys: blk_mq_map_swqueue() q->nr_hw_queues=1
+[   28.257425] BUG: kernel NULL pointer dereference, address: 0000000000000098
+[   28.258362] #PF: supervisor write access in kernel mode
+[   28.259082] #PF: error_code(0x0002) - not-present page
+[   28.259774] PGD 0 P4D 0 
+[   28.260149] Oops: 0002 [#1] SMP PTI
+[   28.260640] CPU: 1 PID: 663 Comm: loop Not tainted 5.6.0-rc7+ #3
+[   28.261472] Hardware name: QEMU Standard PC (i440FX + PIIX, 1996), BIOS rel-1.12.0-59-gc9ba5276e321-prebuilt.qemu.org 04/01/2014
+[   28.262992] RIP: 0010:blk_mq_map_swqueue+0x3e/0x2b0
+... ...
+[   28.266192] RSP: 0018:ffffb3898045be20 EFLAGS: 00010202
+[   28.266866] RAX: 0000000000000001 RBX: ffff8bc7a8498000 RCX: 0000000000000000
+[   28.267836] RDX: 0000000000000000 RSI: ffff8bc7b7c987d8 RDI: ffff8bc7b7c987d8
+[   28.268806] RBP: ffff8bc7ad40bd68 R08: 0000000000000000 R09: 0000000000000001
+[   28.269793] R10: 0000000000000000 R11: ffffb3898045bba8 R12: ffff8bc7ad40bdd8
+[   28.270706] R13: 0000000000000000 R14: ffff8bc7ad40bdf8 R15: 0000000000000001
+[   28.271687] FS:  00007f1c17cff4c0(0000) GS:ffff8bc7b7c80000(0000) knlGS:0000000000000000
+[   28.272805] CS:  0010 DS: 0000 ES: 0000 CR0: 0000000080050033
+[   28.273597] CR2: 0000000000000098 CR3: 0000000228492000 CR4: 00000000000006e0
+[   28.274581] DR0: 0000000000000000 DR1: 0000000000000000 DR2: 0000000000000000
+[   28.275577] DR3: 0000000000000000 DR6: 00000000fffe0ff0 DR7: 0000000000000400
+[   28.276554] Call Trace:
+[   28.276927]  blk_mq_init_allocated_queue+0x3a4/0x410
+[   28.277630]  blk_mq_init_queue+0x32/0x60
+[   28.278139]  loop_add+0xda/0x240
+[   28.278554]  loop_control_ioctl+0x102/0x140
+[   28.279153]  ksys_ioctl+0x81/0xc0
+[   28.279624]  __x64_sys_ioctl+0x11/0x20
+[   28.280135]  do_syscall_64+0x44/0x140
+[   28.280659]  entry_SYSCALL_64_after_hwframe+0x44/0xa9
+[   28.281364] RIP: 0033:0x7f1c178105d7
+
+Signed-off-by: Dongli Zhang <dongli.zhang@oracle.com>
+---
+ block/blk-mq.c | 48 ++++++++++++++++++++++++++++++++++++++++++++++++
+ 1 file changed, 48 insertions(+)
+
+diff --git a/block/blk-mq.c b/block/blk-mq.c
+index d92088dec6c3..dbf67e50a3f5 100644
+--- a/block/blk-mq.c
++++ b/block/blk-mq.c
+@@ -40,6 +40,8 @@
+ #include "blk-mq-sched.h"
+ #include "blk-rq-qos.h"
+ 
++int testsys_debug = 0;
++
+ static void blk_mq_poll_stats_start(struct request_queue *q);
+ static void blk_mq_poll_stats_fn(struct blk_stat_callback *cb);
+ 
+@@ -2375,6 +2377,13 @@ blk_mq_alloc_hctx(struct request_queue *q, struct blk_mq_tag_set *set,
+ 	if (!hctx)
+ 		goto fail_alloc_hctx;
+ 
++	if (testsys_debug) {
++		/* emulate a memory allocation failure for cpumask */
++		pr_alert("testsys: to emulate memory allocation failure\n");
++		testsys_debug = 0;
++		goto free_hctx;
++	}
++
+ 	if (!zalloc_cpumask_var_node(&hctx->cpumask, gfp, node))
+ 		goto free_hctx;
+ 
+@@ -2498,6 +2507,7 @@ static void blk_mq_map_swqueue(struct request_queue *q)
+ 	struct blk_mq_ctx *ctx;
+ 	struct blk_mq_tag_set *set = q->tag_set;
+ 
++	pr_alert("testsys: blk_mq_map_swqueue() q->nr_hw_queues=%d\n", q->nr_hw_queues);
+ 	queue_for_each_hw_ctx(q, hctx, i) {
+ 		cpumask_clear(hctx->cpumask);
+ 		hctx->nr_ctx = 0;
+@@ -2863,6 +2873,8 @@ static void blk_mq_realloc_hw_ctxs(struct blk_mq_tag_set *set,
+ 	 * hctxs and keep the previous q->nr_hw_queues.
+ 	 */
+ 	if (i != set->nr_hw_queues) {
++		pr_alert("testsys: although to increase nr_hw_queues is failed, currently set->nr_hw_queues=%d while q->nr_hw_queues=%d, i=%d\n",
++			 set->nr_hw_queues, q->nr_hw_queues, i);
+ 		j = q->nr_hw_queues;
+ 		end = i;
+ 	} else {
+@@ -3583,10 +3595,46 @@ unsigned int blk_mq_rq_cpu(struct request *rq)
+ }
+ EXPORT_SYMBOL(blk_mq_rq_cpu);
+ 
++static ssize_t
++testsys_show(struct kobject *kobj,
++	     struct kobj_attribute *attr,
++	     char *buf)
++{
++	return sprintf(buf, "%d\n", testsys_debug);
++}
++
++static ssize_t
++testsys_store(struct kobject *kobj,
++	      struct kobj_attribute *attr,
++	      const char *buf, size_t count)
++{
++	sscanf(buf, "%d", &testsys_debug);
++	pr_alert("testsys: testsys_debug is set to %d\n", testsys_debug);
++
++	return count;
++}
++
++static struct kobj_attribute testsys_attr =
++	__ATTR(testsys, 0600,
++	       testsys_show,
++	       testsys_store);
++
++static void testsys_register(void)
++{
++	int ret;
++
++	ret = sysfs_create_file(kernel_kobj, &testsys_attr.attr);
++	if (ret)
++		pr_alert("testsys: failed to create testsys\n");
++	else
++		pr_alert("testsys: the testsys is created successfully\n");
++}
++
+ static int __init blk_mq_init(void)
+ {
+ 	cpuhp_setup_state_multi(CPUHP_BLK_MQ_DEAD, "block/mq:dead", NULL,
+ 				blk_mq_hctx_notify_dead);
++	testsys_register();
+ 	return 0;
+ }
+ subsys_initcall(blk_mq_init);
+-- 
+2.17.1
+
