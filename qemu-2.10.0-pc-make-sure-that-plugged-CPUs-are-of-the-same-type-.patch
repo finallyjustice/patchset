@@ -1,0 +1,66 @@
+From 52cd620a3e5de1e49c6439bc96853c6342bfcfc5 Mon Sep 17 00:00:00 2001
+From: Dongli Zhang <dongli.zhang@oracle.com>
+Date: Tue, 28 Apr 2020 21:17:43 -0700
+Subject: [PATCH 1/1] pc: make sure that plugged CPUs are of the same type for
+ qemu-2.10.0
+
+This is a customized patch based on 6970c5ff13a4 ("pc: make sure that
+plugged CPUs are of the same type") for old version qemu-2.10.0. In
+qemu-2.10.0, the "cpu_type" field is not available.
+
+Signed-off-by: Dongli Zhang <dongli.zhang@oracle.com>
+---
+ hw/i386/pc.c | 30 ++++++++++++++++++++++++++++++
+ 1 file changed, 30 insertions(+)
+
+diff --git a/hw/i386/pc.c b/hw/i386/pc.c
+index 21081041..3d938252 100644
+--- a/hw/i386/pc.c
++++ b/hw/i386/pc.c
+@@ -1900,6 +1900,29 @@ static void pc_cpu_unplug_cb(HotplugHandler *hotplug_dev,
+     error_propagate(errp, local_err);
+ }
+ 
++static const char *parse_cpu_model(const char *cpu_model)
++{
++    ObjectClass *oc;
++    CPUClass *cc;
++    gchar **model_pieces;
++    const char *cpu_type;
++
++    model_pieces = g_strsplit(cpu_model, ",", 2);
++
++    oc = cpu_class_by_name(TYPE_X86_CPU, model_pieces[0]);
++    if (oc == NULL) {
++        error_report("unable to find CPU model '%s'", model_pieces[0]);
++        g_strfreev(model_pieces);
++        exit(EXIT_FAILURE);
++    }
++
++    cpu_type = object_class_get_name(oc);
++    cc = CPU_CLASS(oc);
++    cc->parse_features(cpu_type, model_pieces[1], &error_fatal);
++    g_strfreev(model_pieces);
++    return cpu_type;
++}
++
+ static void pc_cpu_pre_plug(HotplugHandler *hotplug_dev,
+                             DeviceState *dev, Error **errp)
+ {
+@@ -1909,6 +1932,13 @@ static void pc_cpu_pre_plug(HotplugHandler *hotplug_dev,
+     X86CPUTopoInfo topo;
+     X86CPU *cpu = X86_CPU(dev);
+     PCMachineState *pcms = PC_MACHINE(hotplug_dev);
++    MachineState *ms = MACHINE(hotplug_dev);
++    const char *cpu_type = parse_cpu_model(ms->cpu_model);
++
++    if(!object_dynamic_cast(OBJECT(cpu), cpu_type)) {
++        error_setg(errp, "Invalid CPU type, expected cpu type: '%s'", cpu_type);
++        return;
++    }
+ 
+     /* if APIC ID is not set, set it based on socket/core/thread properties */
+     if (cpu->apic_id == UNASSIGNED_APIC_ID) {
+-- 
+2.17.1
+
