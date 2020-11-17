@@ -1,0 +1,68 @@
+From 844869b45050a7f533742097f3bd6c6ea7e31731 Mon Sep 17 00:00:00 2001
+From: Dongli Zhang <dongli.zhang@oracle.com>
+Date: Tue, 17 Nov 2020 12:27:16 -0800
+Subject: [PATCH 1/1] virtio-net: track arp packet at rx path
+
+This patch is based on v5.9 and used to track the ARP packets received by
+virtio-net.
+
+[    5.218570] debug: receive_buf() src: 10.0.0.1(xx.xx.xx.xx.xx.xx), dst: 10.0.0.2(00.00.00.00.00.00)
+[    5.403303] debug: receive_buf() src: 10.0.1.1(xx.xx.xx.xx.xx.xx), dst: 10.0.1.1(ff.ff.ff.ff.ff.ff)
+
+Signed-off-by: Dongli Zhang <dongli.zhang@oracle.com>
+---
+ drivers/net/virtio_net.c | 31 +++++++++++++++++++++++++++++++
+ 1 file changed, 31 insertions(+)
+
+diff --git a/drivers/net/virtio_net.c b/drivers/net/virtio_net.c
+index 668685c09e65..0a7d4b6d31ca 100644
+--- a/drivers/net/virtio_net.c
++++ b/drivers/net/virtio_net.c
+@@ -1042,6 +1042,13 @@ static void receive_buf(struct virtnet_info *vi, struct receive_queue *rq,
+ 	struct sk_buff *skb;
+ 	struct virtio_net_hdr_mrg_rxbuf *hdr;
+ 
++	struct ethhdr *m_eh;
++	struct arphdr *arp;
++	unsigned char *arp_ptr;
++	unsigned char sip[4], tip[4];
++	unsigned char smac[6], tmac[6];
++	void *mac_base;
++
+ 	if (unlikely(len < vi->hdr_len + ETH_HLEN)) {
+ 		pr_debug("%s: short packet %i\n", dev->name, len);
+ 		dev->stats.rx_length_errors++;
+@@ -1084,6 +1091,30 @@ static void receive_buf(struct virtnet_info *vi, struct receive_queue *rq,
+ 	pr_debug("Receiving skb proto 0x%04x len %i type %i\n",
+ 		 ntohs(skb->protocol), skb->len, skb->pkt_type);
+ 
++	m_eh = (struct ethhdr *)skb_mac_header(skb);
++	mac_base = (void *) m_eh;
++
++	if (m_eh->h_proto == htons(ETH_P_ARP)) {
++		arp = (struct arphdr *)(mac_base + ETH_HLEN);
++
++		if (arp->ar_pro == htons(ETH_P_IP) &&
++		    arp->ar_op == htons(ARPOP_REQUEST)) {
++			arp_ptr = (unsigned char *)(arp + 1);
++
++			memcpy(&smac, arp_ptr,      6);
++			memcpy(&sip,  arp_ptr + 6,  4);
++			memcpy(&tmac, arp_ptr + 10, 6);
++			memcpy(&tip,  arp_ptr + 16, 4);
++
++			pr_alert("debug: receive_buf() src: %u.%u.%u.%u(%02x.%02x.%02x.%02x.%02x.%02x), "
++				 "dst: %u.%u.%u.%u(%02x.%02x.%02x.%02x.%02x.%02x)\n",
++				 sip[0], sip[1], sip[2], sip[3],
++				 smac[0], smac[1], smac[2], smac[3], smac[4], smac[5],
++				 tip[0], tip[1], tip[2], tip[3],
++				 tmac[0], tmac[1], tmac[2], tmac[3], tmac[4], tmac[5]);
++		}
++	}
++
+ 	napi_gro_receive(&rq->napi, skb);
+ 	return;
+ 
+-- 
+2.17.1
+
