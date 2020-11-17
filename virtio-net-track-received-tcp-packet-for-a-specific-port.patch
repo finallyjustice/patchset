@@ -1,0 +1,78 @@
+From b51d66c1b09551bfa8423c065d5b47be94ff2ae1 Mon Sep 17 00:00:00 2001
+From: Dongli Zhang <dongli.zhang@oracle.com>
+Date: Tue, 17 Nov 2020 13:06:48 -0800
+Subject: [PATCH 1/1] virtio-net: track received tcp packet for a specific port
+
+[   39.272541] debug: virtio src=33864, dst=5201, len=60, seq=3857521509, ack_seq=0, ack=0, syn=16777216, fin=0
+[   39.274099] debug: virtio src=33864, dst=5201, len=52, seq=3857521510, ack_seq=3005742654, ack=16777216, syn=0, fin=0
+[   39.275729] debug: virtio src=33864, dst=5201, len=89, seq=3857521510, ack_seq=3005742654, ack=16777216, syn=0, fin=0
+[   39.277521] debug: virtio src=33864, dst=5201, len=52, seq=3857521547, ack_seq=3005742655, ack=16777216, syn=0, fin=0
+[   39.277554] debug: virtio src=33864, dst=5201, len=56, seq=3857521547, ack_seq=3005742655, ack=16777216, syn=0, fin=0
+[   39.281248] debug: virtio src=33864, dst=5201, len=134, seq=3857521551, ack_seq=3005742655, ack=16777216, syn=0, fin=0
+[   39.283455] debug: virtio src=33866, dst=5201, len=60, seq=2206739930, ack_seq=0, ack=0, syn=16777216, fin=0
+[   39.284966] debug: virtio src=33866, dst=5201, len=89, seq=2206739931, ack_seq=2657703759, ack=16777216, syn=0, fin=0
+[   39.285117] debug: virtio src=33866, dst=5201, len=52, seq=2206739931, ack_seq=2657703759, ack=16777216, syn=0, fin=0
+[   39.323641] debug: virtio src=33864, dst=5201, len=52, seq=3857521633, ack_seq=3005742656, ack=16777216, syn=0, fin=0
+[   39.325196] debug: virtio src=33864, dst=5201, len=52, seq=3857521633, ack_seq=3005742658, ack=16777216, syn=0, fin=0
+[   39.325235] debug: virtio src=33866, dst=5201, len=7292, seq=2206739968, ack_seq=2657703759, ack=16777216, syn=0, fin=0
+[   39.328659] debug: virtio src=33866, dst=5201, len=7292, seq=2206747208, ack_seq=2657703759, ack=16777216, syn=0, fin=0
+[   39.330618] debug: virtio src=33866, dst=5201, len=10188, seq=2206754448, ack_seq=2657703759, ack=16777216, syn=0, fin=0
+[   39.330636] debug: virtio src=33866, dst=5201, len=14532, seq=2206764584, ack_seq=2657703759, ack=16777216, syn=0, fin=0
+[   39.333777] debug: virtio src=33866, dst=5201, len=4396, seq=2206779064, ack_seq=2657703759, ack=16777216, syn=0, fin=0
+[   39.335317] debug: virtio src=33866, dst=5201, len=2948, seq=2206783408, ack_seq=2657703759, ack=16777216, syn=0, fin=0
+[   39.336868] debug: virtio src=33866, dst=5201, len=11636, seq=2206786304, ack_seq=2657703759, ack=16777216, syn=0, fin=0
+[   39.337085] debug: virtio src=33866, dst=5201, len=8740, seq=2206808024, ack_seq=2657703759, ack=16777216, syn=0, fin=0
+[   39.338743] debug: virtio src=33866, dst=5201, len=10188, seq=2206797888, ack_seq=2657703759, ack=16777216, syn=0, fin=0
+[   39.340551] debug: virtio src=33866, dst=5201, len=8740, seq=2206786304, ack_seq=2657703759, ack=16777216, syn=0, fin=0
+
+Signed-off-by: Dongli Zhang <dongli.zhang@oracle.com>
+---
+ drivers/net/virtio_net.c | 25 +++++++++++++++++++++++++
+ 1 file changed, 25 insertions(+)
+
+diff --git a/drivers/net/virtio_net.c b/drivers/net/virtio_net.c
+index 668685c09e65..3e823542190b 100644
+--- a/drivers/net/virtio_net.c
++++ b/drivers/net/virtio_net.c
+@@ -1042,6 +1042,11 @@ static void receive_buf(struct virtnet_info *vi, struct receive_queue *rq,
+ 	struct sk_buff *skb;
+ 	struct virtio_net_hdr_mrg_rxbuf *hdr;
+ 
++	struct ethhdr *m_eh;
++	struct iphdr *m_iph;
++	struct tcphdr *m_th;
++	void *mac_base;
++
+ 	if (unlikely(len < vi->hdr_len + ETH_HLEN)) {
+ 		pr_debug("%s: short packet %i\n", dev->name, len);
+ 		dev->stats.rx_length_errors++;
+@@ -1084,6 +1089,26 @@ static void receive_buf(struct virtnet_info *vi, struct receive_queue *rq,
+ 	pr_debug("Receiving skb proto 0x%04x len %i type %i\n",
+ 		 ntohs(skb->protocol), skb->len, skb->pkt_type);
+ 
++	m_eh = (struct ethhdr *)skb_mac_header(skb);
++	mac_base = (void *) m_eh;
++
++	if (m_eh->h_proto == htons(ETH_P_IP)) {
++		m_iph = (struct iphdr *)(mac_base + ETH_HLEN);
++
++		if (m_iph->ihl >= 5 && m_iph->version == 4 &&
++		    m_iph->protocol == IPPROTO_TCP) {
++			m_th = (struct tcphdr *)(mac_base + ETH_HLEN + m_iph->ihl * 4);
++
++			if (ntohs(m_th->source) == 5201 || ntohs(m_th->dest) == 5201) {
++				pr_alert("debug: virtio src=%d, dst=%d, len=%d, seq=%u, ack_seq=%u, ack=%u, syn=%u, fin=%u\n",
++					 ntohs(m_th->source), ntohs(m_th->dest),
++					 ntohs(m_iph->tot_len), ntohl(m_th->seq),
++					 ntohl(m_th->ack_seq), ntohl(m_th->ack),
++					 ntohl(m_th->syn), ntohl(m_th->fin));
++			}
++		}
++	}
++
+ 	napi_gro_receive(&rq->napi, skb);
+ 	return;
+ 
+-- 
+2.17.1
+
