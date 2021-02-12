@@ -1,0 +1,146 @@
+[PATCH RFC v1 0/6] swiotlb: 64-bit DMA buffer
+
+This RFC is to introduce the 2nd swiotlb buffer for 64-bit DMA access.  The
+prototype is based on v5.11-rc6.
+
+The state of the art swiotlb pre-allocates <=32-bit memory in order to meet
+the DMA mask requirement for some 32-bit legacy device. Considering most
+devices nowadays support 64-bit DMA and IOMMU is available, the swiotlb is
+not used for most of times, except:
+
+1. The xen PVM domain requires the DMA addresses to both (1) <= the device
+dma mask, and (2) continuous in machine address. Therefore, the 64-bit
+device may still require swiotlb on PVM domain.
+
+2. From source code the AMD SME/SEV will enable SWIOTLB_FORCE. As a result
+it is always required to allocate from swiotlb buffer even the device dma
+mask is 64-bit.
+
+sme_early_init()
+-> if (sev_active())
+       swiotlb_force = SWIOTLB_FORCE;
+
+
+Therefore, this RFC introduces the 2nd swiotlb buffer for 64-bit DMA
+access.  For instance, the swiotlb_tbl_map_single() allocates from the 2nd
+64-bit buffer if the device DMA mask min_not_zero(*hwdev->dma_mask,
+hwdev->bus_dma_limit) is 64-bit.  With the RFC, the Xen/AMD will be able to
+allocate >4GB swiotlb buffer.
+
+With it being 64-bit, you can (not in this patch set but certainly
+possible) allocate this at runtime. Meaning the size could change depending
+on the device MMIO buffers, etc.
+
+
+I have tested the patch set on Xen PVM dom0 boot via QEMU. The dom0 is boot
+via:
+
+qemu-system-x86_64 -smp 8 -m 20G -enable-kvm -vnc :9 \
+-net nic -net user,hostfwd=tcp::5029-:22 \
+-hda disk.img \
+-device nvme,drive=nvme0,serial=deudbeaf1,max_ioqpairs=16 \
+-drive file=test.qcow2,if=none,id=nvme0 \
+-serial stdio
+
+The "swiotlb=65536,1048576,force" is to configure 32-bit swiotlb as 128MB
+and 64-bit swiotlb as 2048MB. The swiotlb is enforced.
+
+vm# cat /proc/cmdline 
+placeholder root=UUID=4e942d60-c228-4caf-b98e-f41c365d9703 ro text
+swiotlb=65536,1048576,force quiet splash
+
+[    5.119877] Booting paravirtualized kernel on Xen
+... ...
+[    5.190423] software IO TLB: Low Mem mapped [mem 0x0000000234e00000-0x000000023ce00000] (128MB)
+[    6.276161] software IO TLB: High Mem mapped [mem 0x0000000166f33000-0x00000001e6f33000] (2048MB)
+
+0x0000000234e00000 is mapped to 0x00000000001c0000 (32-bit machine address)
+0x000000023ce00000-1 is mapped to 0x000000000ff3ffff (32-bit machine address)
+0x0000000166f33000 is mapped to 0x00000004b7280000 (64-bit machine address)
+0x00000001e6f33000-1 is mapped to 0x000000033a07ffff (64-bit machine address)
+
+
+While running fio for emulated-NVMe, the swiotlb is allocating from 64-bit
+io_tlb_used-highmem.
+
+vm# cat /sys/kernel/debug/swiotlb/io_tlb_nslabs
+65536
+vm# cat /sys/kernel/debug/swiotlb/io_tlb_used
+258
+vm# cat /sys/kernel/debug/swiotlb/io_tlb_nslabs-highmem
+1048576
+vm# cat /sys/kernel/debug/swiotlb/io_tlb_used-highmem
+58880
+
+
+I also tested virtio-scsi (with "disable-legacy=on,iommu_platform=true") on
+VM with AMD SEV enabled.
+
+qemu-system-x86_64 -enable-kvm -machine q35 -smp 36 -m 20G \
+-drive if=pflash,format=raw,unit=0,file=OVMF_CODE.pure-efi.fd,readonly \
+-drive if=pflash,format=raw,unit=1,file=OVMF_VARS.fd \
+-hda ol7-uefi.qcow2 -serial stdio -vnc :9 \
+-net nic -net user,hostfwd=tcp::5029-:22 \
+-cpu EPYC -object sev-guest,id=sev0,cbitpos=47,reduced-phys-bits=1 \
+-machine memory-encryption=sev0 \
+-device virtio-scsi-pci,id=scsi,disable-legacy=on,iommu_platform=true \
+-device scsi-hd,drive=disk0 \
+-drive file=test.qcow2,if=none,id=disk0,format=qcow2
+
+The "swiotlb=65536,1048576" is to configure 32-bit swiotlb as 128MB and
+64-bit swiotlb as 2048MB. We do not need to force swiotlb because AMD SEV
+will set SWIOTLB_FORCE.
+
+# cat /proc/cmdline
+BOOT_IMAGE=/vmlinuz-5.11.0-rc6swiotlb+ root=/dev/mapper/ol-root ro
+crashkernel=auto rd.lvm.lv=ol/root rd.lvm.lv=ol/swap rhgb quiet
+LANG=en_US.UTF-8 swiotlb=65536,1048576
+
+[    0.729790] AMD Memory Encryption Features active: SEV
+... ...
+[    2.113147] software IO TLB: Low Mem mapped [mem 0x0000000073e1e000-0x000000007be1e000] (128MB)
+[    2.113151] software IO TLB: High Mem mapped [mem 0x00000004e8400000-0x0000000568400000] (2048MB)
+
+While running fio for virtio-scsi, the swiotlb is allocating from 64-bit
+io_tlb_used-highmem.
+
+vm# cat /sys/kernel/debug/swiotlb/io_tlb_nslabs
+65536
+vm# cat /sys/kernel/debug/swiotlb/io_tlb_used
+0
+vm# cat /sys/kernel/debug/swiotlb/io_tlb_nslabs-highmem
+1048576
+vm# cat /sys/kernel/debug/swiotlb/io_tlb_used-highmem
+64647
+
+
+Please let me know if there is any feedback for this idea and RFC.
+
+
+Dongli Zhang (6):
+   swiotlb: define new enumerated type
+   swiotlb: convert variables to arrays
+   swiotlb: introduce swiotlb_get_type() to calculate swiotlb buffer type
+   swiotlb: enable 64-bit swiotlb
+   xen-swiotlb: convert variables to arrays
+   xen-swiotlb: enable 64-bit xen-swiotlb
+
+ arch/mips/cavium-octeon/dma-octeon.c         |   3 +-
+ arch/powerpc/kernel/dma-swiotlb.c            |   2 +-
+ arch/powerpc/platforms/pseries/svm.c         |   8 +-
+ arch/x86/kernel/pci-swiotlb.c                |   5 +-
+ arch/x86/pci/sta2x11-fixup.c                 |   2 +-
+ drivers/gpu/drm/i915/gem/i915_gem_internal.c |   4 +-
+ drivers/gpu/drm/i915/i915_scatterlist.h      |   2 +-
+ drivers/gpu/drm/nouveau/nouveau_ttm.c        |   2 +-
+ drivers/mmc/host/sdhci.c                     |   2 +-
+ drivers/pci/xen-pcifront.c                   |   2 +-
+ drivers/xen/swiotlb-xen.c                    | 123 ++++---
+ include/linux/swiotlb.h                      |  49 ++-
+ kernel/dma/swiotlb.c                         | 382 +++++++++++++---------
+ 13 files changed, 363 insertions(+), 223 deletions(-)
+
+
+Thank you very much!
+
+Dongli Zhang

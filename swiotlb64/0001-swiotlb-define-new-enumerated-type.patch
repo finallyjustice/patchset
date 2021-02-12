@@ -1,0 +1,38 @@
+From 69d3b4785a963e3a82e38094bbf0524052fd8e28 Mon Sep 17 00:00:00 2001
+From: Dongli Zhang <dongli.zhang@oracle.com>
+Date: Wed, 27 Jan 2021 22:25:31 -0800
+Subject: [PATCH RFC v1 1/6] swiotlb: define new enumerated type
+
+This is just to define new enumerated type without functional change.
+
+The 'SWIOTLB_LO' is to index legacy 32-bit swiotlb buffer, while the
+'SWIOTLB_HI' is to index the 64-bit buffer.
+
+This is to prepare to enable 64-bit swiotlb.
+
+Cc: Joe Jin <joe.jin@oracle.com>
+Signed-off-by: Dongli Zhang <dongli.zhang@oracle.com>
+---
+ include/linux/swiotlb.h | 6 ++++++
+ 1 file changed, 6 insertions(+)
+
+diff --git a/include/linux/swiotlb.h b/include/linux/swiotlb.h
+index d9c9fc9ca5d2..ca125c1b1281 100644
+--- a/include/linux/swiotlb.h
++++ b/include/linux/swiotlb.h
+@@ -17,6 +17,12 @@ enum swiotlb_force {
+ 	SWIOTLB_NO_FORCE,	/* swiotlb=noforce */
+ };
+ 
++enum swiotlb_t {
++	SWIOTLB_LO,
++	SWIOTLB_HI,
++	SWIOTLB_MAX,
++};
++
+ /*
+  * Maximum allowable number of contiguous slabs to map,
+  * must be a power of 2.  What is the appropriate value ?
+-- 
+2.17.1
+

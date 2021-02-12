@@ -1,0 +1,264 @@
+From 19474795fd3c32e86f55fd42299849402a8624db Mon Sep 17 00:00:00 2001
+From: Dongli Zhang <dongli.zhang@oracle.com>
+Date: Sun, 31 Jan 2021 13:27:18 -0800
+Subject: [PATCH RFC v1 6/6] xen-swiotlb: enable 64-bit xen-swiotlb
+
+This patch is to enable the 64-bit xen-swiotlb buffer.
+
+For Xen PVM DMA address, the 64-bit device will be able to allocate from
+64-bit swiotlb buffer.
+
+Cc: Joe Jin <joe.jin@oracle.com>
+Signed-off-by: Dongli Zhang <dongli.zhang@oracle.com>
+---
+ drivers/xen/swiotlb-xen.c | 117 ++++++++++++++++++++++++--------------
+ 1 file changed, 74 insertions(+), 43 deletions(-)
+
+diff --git a/drivers/xen/swiotlb-xen.c b/drivers/xen/swiotlb-xen.c
+index e18cae693cdc..c9ab07809e32 100644
+--- a/drivers/xen/swiotlb-xen.c
++++ b/drivers/xen/swiotlb-xen.c
+@@ -108,27 +108,36 @@ static int is_xen_swiotlb_buffer(struct device *dev, dma_addr_t dma_addr)
+ 	unsigned long bfn = XEN_PFN_DOWN(dma_to_phys(dev, dma_addr));
+ 	unsigned long xen_pfn = bfn_to_local_pfn(bfn);
+ 	phys_addr_t paddr = (phys_addr_t)xen_pfn << XEN_PAGE_SHIFT;
++	int i;
+ 
+ 	/* If the address is outside our domain, it CAN
+ 	 * have the same virtual address as another address
+ 	 * in our domain. Therefore _only_ check address within our domain.
+ 	 */
+-	if (pfn_valid(PFN_DOWN(paddr))) {
+-		return paddr >= virt_to_phys(xen_io_tlb_start[SWIOTLB_LO]) &&
+-		       paddr < virt_to_phys(xen_io_tlb_end[SWIOTLB_LO]);
+-	}
++	if (!pfn_valid(PFN_DOWN(paddr)))
++		return 0;
++
++	for (i = 0; i < swiotlb_nr; i++)
++		if (paddr >= virt_to_phys(xen_io_tlb_start[i]) &&
++		    paddr < virt_to_phys(xen_io_tlb_end[i]))
++			return 1;
++
+ 	return 0;
+ }
+ 
+ static int
+-xen_swiotlb_fixup(void *buf, size_t size, unsigned long nslabs)
++xen_swiotlb_fixup(void *buf, size_t size, unsigned long nslabs,
++		  enum swiotlb_t type)
+ {
+ 	int i, rc;
+ 	int dma_bits;
+ 	dma_addr_t dma_handle;
+ 	phys_addr_t p = virt_to_phys(buf);
+ 
+-	dma_bits = get_order(IO_TLB_SEGSIZE << IO_TLB_SHIFT) + PAGE_SHIFT;
++	if (type == SWIOTLB_HI)
++		dma_bits = max_dma_bits[SWIOTLB_HI];
++	else
++		dma_bits = get_order(IO_TLB_SEGSIZE << IO_TLB_SHIFT) + PAGE_SHIFT;
+ 
+ 	i = 0;
+ 	do {
+@@ -139,7 +148,7 @@ xen_swiotlb_fixup(void *buf, size_t size, unsigned long nslabs)
+ 				p + (i << IO_TLB_SHIFT),
+ 				get_order(slabs << IO_TLB_SHIFT),
+ 				dma_bits, &dma_handle);
+-		} while (rc && dma_bits++ < max_dma_bits[SWIOTLB_LO]);
++		} while (rc && dma_bits++ < max_dma_bits[type]);
+ 		if (rc)
+ 			return rc;
+ 
+@@ -147,16 +156,17 @@ xen_swiotlb_fixup(void *buf, size_t size, unsigned long nslabs)
+ 	} while (i < nslabs);
+ 	return 0;
+ }
+-static unsigned long xen_set_nslabs(unsigned long nr_tbl)
++
++static unsigned long xen_set_nslabs(unsigned long nr_tbl, enum swiotlb_t type)
+ {
+ 	if (!nr_tbl) {
+-		xen_io_tlb_nslabs[SWIOTLB_LO] = (64 * 1024 * 1024 >> IO_TLB_SHIFT);
+-		xen_io_tlb_nslabs[SWIOTLB_LO] = ALIGN(xen_io_tlb_nslabs[SWIOTLB_LO],
++		xen_io_tlb_nslabs[type] = (64 * 1024 * 1024 >> IO_TLB_SHIFT);
++		xen_io_tlb_nslabs[type] = ALIGN(xen_io_tlb_nslabs[type],
+ 						      IO_TLB_SEGSIZE);
+ 	} else
+-		xen_io_tlb_nslabs[SWIOTLB_LO] = nr_tbl;
++		xen_io_tlb_nslabs[type] = nr_tbl;
+ 
+-	return xen_io_tlb_nslabs[SWIOTLB_LO] << IO_TLB_SHIFT;
++	return xen_io_tlb_nslabs[type] << IO_TLB_SHIFT;
+ }
+ 
+ enum xen_swiotlb_err {
+@@ -180,23 +190,24 @@ static const char *xen_swiotlb_error(enum xen_swiotlb_err err)
+ 	}
+ 	return "";
+ }
+-int __ref xen_swiotlb_init(int verbose, bool early)
++
++static int xen_swiotlb_init_type(int verbose, bool early, enum swiotlb_t type)
+ {
+ 	unsigned long bytes, order;
+ 	int rc = -ENOMEM;
+ 	enum xen_swiotlb_err m_ret = XEN_SWIOTLB_UNKNOWN;
+ 	unsigned int repeat = 3;
+ 
+-	xen_io_tlb_nslabs[SWIOTLB_LO] = swiotlb_nr_tbl(SWIOTLB_LO);
++	xen_io_tlb_nslabs[type] = swiotlb_nr_tbl(type);
+ retry:
+-	bytes = xen_set_nslabs(xen_io_tlb_nslabs[SWIOTLB_LO]);
+-	order = get_order(xen_io_tlb_nslabs[SWIOTLB_LO] << IO_TLB_SHIFT);
++	bytes = xen_set_nslabs(xen_io_tlb_nslabs[type], type);
++	order = get_order(xen_io_tlb_nslabs[type] << IO_TLB_SHIFT);
+ 
+ 	/*
+ 	 * IO TLB memory already allocated. Just use it.
+ 	 */
+-	if (io_tlb_start[SWIOTLB_LO] != 0) {
+-		xen_io_tlb_start[SWIOTLB_LO] = phys_to_virt(io_tlb_start[SWIOTLB_LO]);
++	if (io_tlb_start[type] != 0) {
++		xen_io_tlb_start[type] = phys_to_virt(io_tlb_start[type]);
+ 		goto end;
+ 	}
+ 
+@@ -204,81 +215,95 @@ int __ref xen_swiotlb_init(int verbose, bool early)
+ 	 * Get IO TLB memory from any location.
+ 	 */
+ 	if (early) {
+-		xen_io_tlb_start[SWIOTLB_LO] = memblock_alloc(PAGE_ALIGN(bytes),
++		xen_io_tlb_start[type] = memblock_alloc(PAGE_ALIGN(bytes),
+ 						  PAGE_SIZE);
+-		if (!xen_io_tlb_start[SWIOTLB_LO])
++		if (!xen_io_tlb_start[type])
+ 			panic("%s: Failed to allocate %lu bytes align=0x%lx\n",
+ 			      __func__, PAGE_ALIGN(bytes), PAGE_SIZE);
+ 	} else {
+ #define SLABS_PER_PAGE (1 << (PAGE_SHIFT - IO_TLB_SHIFT))
+ #define IO_TLB_MIN_SLABS ((1<<20) >> IO_TLB_SHIFT)
+ 		while ((SLABS_PER_PAGE << order) > IO_TLB_MIN_SLABS) {
+-			xen_io_tlb_start[SWIOTLB_LO] = (void *)xen_get_swiotlb_free_pages(order);
+-			if (xen_io_tlb_start[SWIOTLB_LO])
++			xen_io_tlb_start[type] = (void *)xen_get_swiotlb_free_pages(order);
++			if (xen_io_tlb_start[type])
+ 				break;
+ 			order--;
+ 		}
+ 		if (order != get_order(bytes)) {
+ 			pr_warn("Warning: only able to allocate %ld MB for software IO TLB\n",
+ 				(PAGE_SIZE << order) >> 20);
+-			xen_io_tlb_nslabs[SWIOTLB_LO] = SLABS_PER_PAGE << order;
+-			bytes = xen_io_tlb_nslabs[SWIOTLB_LO] << IO_TLB_SHIFT;
++			xen_io_tlb_nslabs[type] = SLABS_PER_PAGE << order;
++			bytes = xen_io_tlb_nslabs[type] << IO_TLB_SHIFT;
+ 		}
+ 	}
+-	if (!xen_io_tlb_start[SWIOTLB_LO]) {
++	if (!xen_io_tlb_start[type]) {
+ 		m_ret = XEN_SWIOTLB_ENOMEM;
+ 		goto error;
+ 	}
+ 	/*
+ 	 * And replace that memory with pages under 4GB.
+ 	 */
+-	rc = xen_swiotlb_fixup(xen_io_tlb_start[SWIOTLB_LO],
++	rc = xen_swiotlb_fixup(xen_io_tlb_start[type],
+ 			       bytes,
+-			       xen_io_tlb_nslabs[SWIOTLB_LO]);
++			       xen_io_tlb_nslabs[type],
++			       type);
+ 	if (rc) {
+ 		if (early)
+-			memblock_free(__pa(xen_io_tlb_start[SWIOTLB_LO]),
++			memblock_free(__pa(xen_io_tlb_start[type]),
+ 				      PAGE_ALIGN(bytes));
+ 		else {
+-			free_pages((unsigned long)xen_io_tlb_start[SWIOTLB_LO], order);
+-			xen_io_tlb_start[SWIOTLB_LO] = NULL;
++			free_pages((unsigned long)xen_io_tlb_start[type], order);
++			xen_io_tlb_start[type] = NULL;
+ 		}
+ 		m_ret = XEN_SWIOTLB_EFIXUP;
+ 		goto error;
+ 	}
+ 	if (early) {
+-		if (swiotlb_init_with_tbl(xen_io_tlb_start[SWIOTLB_LO],
+-					  xen_io_tlb_nslabs[SWIOTLB_LO],
+-					  SWIOTLB_LO, verbose))
++		if (swiotlb_init_with_tbl(xen_io_tlb_start[type],
++					  xen_io_tlb_nslabs[type],
++					  type, verbose))
+ 			panic("Cannot allocate SWIOTLB buffer");
+ 		rc = 0;
+ 	} else
+-		rc = swiotlb_late_init_with_tbl(xen_io_tlb_start[SWIOTLB_LO],
+-						xen_io_tlb_nslabs[SWIOTLB_LO],
+-						SWIOTLB_LO);
++		rc = swiotlb_late_init_with_tbl(xen_io_tlb_start[type],
++						xen_io_tlb_nslabs[type],
++						type);
+ 
+ end:
+-	xen_io_tlb_end[SWIOTLB_LO] = xen_io_tlb_start[SWIOTLB_LO] + bytes;
++	xen_io_tlb_end[type] = xen_io_tlb_start[type] + bytes;
+ 	if (!rc)
+-		swiotlb_set_max_segment(PAGE_SIZE, SWIOTLB_LO);
++		swiotlb_set_max_segment(PAGE_SIZE, type);
+ 
+ 	return rc;
+ error:
+ 	if (repeat--) {
+-		xen_io_tlb_nslabs[SWIOTLB_LO] = max(1024UL, /* Min is 2MB */
+-					(xen_io_tlb_nslabs[SWIOTLB_LO] >> 1));
++		xen_io_tlb_nslabs[type] = max(1024UL, /* Min is 2MB */
++					(xen_io_tlb_nslabs[type] >> 1));
+ 		pr_info("Lowering to %luMB\n",
+-			(xen_io_tlb_nslabs[SWIOTLB_LO] << IO_TLB_SHIFT) >> 20);
++			(xen_io_tlb_nslabs[type] << IO_TLB_SHIFT) >> 20);
+ 		goto retry;
+ 	}
+ 	pr_err("%s (rc:%d)\n", xen_swiotlb_error(m_ret), rc);
+ 	if (early)
+ 		panic("%s (rc:%d)", xen_swiotlb_error(m_ret), rc);
+ 	else
+-		free_pages((unsigned long)xen_io_tlb_start[SWIOTLB_LO], order);
++		free_pages((unsigned long)xen_io_tlb_start[type], order);
+ 	return rc;
+ }
+ 
++int __ref xen_swiotlb_init(int verbose, bool early)
++{
++	int i, rc;
++
++	for (i = 0; i < swiotlb_nr; i++) {
++		rc = xen_swiotlb_init_type(verbose, early, i);
++		if (rc)
++			return rc;
++	}
++
++	return 0;
++}
++
+ static void *
+ xen_swiotlb_alloc_coherent(struct device *hwdev, size_t size,
+ 			   dma_addr_t *dma_handle, gfp_t flags,
+@@ -566,7 +591,13 @@ xen_swiotlb_sync_sg_for_device(struct device *dev, struct scatterlist *sgl,
+ static int
+ xen_swiotlb_dma_supported(struct device *hwdev, u64 mask)
+ {
+-	return xen_virt_to_bus(hwdev, xen_io_tlb_end[SWIOTLB_LO] - 1) <= mask;
++	int i;
++
++	for (i = 0; i < swiotlb_nr; i++)
++		if (xen_virt_to_bus(hwdev, xen_io_tlb_end[i] - 1) <= mask)
++			return true;
++
++	return false;
+ }
+ 
+ const struct dma_map_ops xen_swiotlb_dma_ops = {
+-- 
+2.17.1
+
