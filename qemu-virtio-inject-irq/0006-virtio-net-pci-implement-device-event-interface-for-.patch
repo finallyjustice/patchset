@@ -1,0 +1,78 @@
+From 7650c73c39c3f5fc8a5cad5d993d734d338ace30 Mon Sep 17 00:00:00 2001
+From: Dongli Zhang <dongli.zhang@oracle.com>
+Date: Sun, 21 Mar 2021 19:12:04 -0700
+Subject: [PATCH v1 6/6] virtio-net-pci: implement device event interface for
+ kick/call
+
+This is to implement the device event interface for virtio-net-pci.
+
+Signed-off-by: Dongli Zhang <dongli.zhang@oracle.com>
+---
+ hw/net/virtio-net.c            |  9 +++++++++
+ hw/virtio/virtio-net-pci.c     | 10 ++++++++++
+ include/hw/virtio/virtio-net.h |  3 +++
+ 3 files changed, 22 insertions(+)
+
+diff --git a/hw/net/virtio-net.c b/hw/net/virtio-net.c
+index 66b9ff4511..b5c3fa392c 100644
+--- a/hw/net/virtio-net.c
++++ b/hw/net/virtio-net.c
+@@ -3195,6 +3195,15 @@ static bool failover_hide_primary_device(DeviceListener *listener,
+     return qatomic_read(&n->failover_primary_hidden);
+ }
+ 
++void virtio_net_device_event(DeviceState *dev, int event, int queue,
++                             Error **errp)
++{
++    VirtIONet *n = VIRTIO_NET(dev);
++    bool irqfd = n->vhost_started;
++
++    virtio_device_event(dev, event, queue, irqfd, errp);
++}
++
+ static void virtio_net_device_realize(DeviceState *dev, Error **errp)
+ {
+     VirtIODevice *vdev = VIRTIO_DEVICE(dev);
+diff --git a/hw/virtio/virtio-net-pci.c b/hw/virtio/virtio-net-pci.c
+index aa0b3caecb..1fa5a6fe5d 100644
+--- a/hw/virtio/virtio-net-pci.c
++++ b/hw/virtio/virtio-net-pci.c
+@@ -46,6 +46,15 @@ static Property virtio_net_properties[] = {
+     DEFINE_PROP_END_OF_LIST(),
+ };
+ 
++static void virtio_net_pci_event(DeviceState *dev, int event, int queue,
++                                 Error **errp)
++{
++    VirtIONetPCI *vnet = VIRTIO_NET_PCI(dev);
++    DeviceState *vdev = DEVICE(&vnet->vdev);
++
++    virtio_net_device_event(vdev, event, queue, errp);
++}
++
+ static void virtio_net_pci_realize(VirtIOPCIProxy *vpci_dev, Error **errp)
+ {
+     DeviceState *qdev = DEVICE(vpci_dev);
+@@ -77,6 +86,7 @@ static void virtio_net_pci_class_init(ObjectClass *klass, void *data)
+     k->class_id = PCI_CLASS_NETWORK_ETHERNET;
+     set_bit(DEVICE_CATEGORY_NETWORK, dc->categories);
+     device_class_set_props(dc, virtio_net_properties);
++    dc->event = virtio_net_pci_event;
+     vpciklass->realize = virtio_net_pci_realize;
+ }
+ 
+diff --git a/include/hw/virtio/virtio-net.h b/include/hw/virtio/virtio-net.h
+index 7e96d193aa..d88c9969ea 100644
+--- a/include/hw/virtio/virtio-net.h
++++ b/include/hw/virtio/virtio-net.h
+@@ -214,4 +214,7 @@ struct VirtIONet {
+ void virtio_net_set_netclient_name(VirtIONet *n, const char *name,
+                                    const char *type);
+ 
++void virtio_net_device_event(DeviceState *dev, int event, int queue,
++                             Error **errp);
++
+ #endif
+-- 
+2.17.1
+

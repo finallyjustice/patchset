@@ -1,0 +1,75 @@
+From 334ed8e8cb1e28f3ace9fda6f5b7b7ffe2a52001 Mon Sep 17 00:00:00 2001
+From: Dongli Zhang <dongli.zhang@oracle.com>
+Date: Sun, 21 Mar 2021 17:50:38 -0700
+Subject: [PATCH v1 5/6] vhost-scsi-pci: implement device event interface for
+ kick/call
+
+This is to implement the device event interface for vhost-scsi-pci.
+
+Signed-off-by: Dongli Zhang <dongli.zhang@oracle.com>
+---
+ hw/scsi/vhost-scsi.c           |  6 ++++++
+ hw/virtio/vhost-scsi-pci.c     | 10 ++++++++++
+ include/hw/virtio/vhost-scsi.h |  3 +++
+ 3 files changed, 19 insertions(+)
+
+diff --git a/hw/scsi/vhost-scsi.c b/hw/scsi/vhost-scsi.c
+index 4d70fa036b..11dd94ff92 100644
+--- a/hw/scsi/vhost-scsi.c
++++ b/hw/scsi/vhost-scsi.c
+@@ -163,6 +163,12 @@ static const VMStateDescription vmstate_virtio_vhost_scsi = {
+     .pre_save = vhost_scsi_pre_save,
+ };
+ 
++void vhost_scsi_device_event(DeviceState *dev, int event, int queue,
++                             Error **errp)
++{
++    virtio_device_event(dev, event, queue, true, errp);
++}
++
+ static void vhost_scsi_realize(DeviceState *dev, Error **errp)
+ {
+     VirtIOSCSICommon *vs = VIRTIO_SCSI_COMMON(dev);
+diff --git a/hw/virtio/vhost-scsi-pci.c b/hw/virtio/vhost-scsi-pci.c
+index cb71a294fa..c7a614cb11 100644
+--- a/hw/virtio/vhost-scsi-pci.c
++++ b/hw/virtio/vhost-scsi-pci.c
+@@ -44,6 +44,15 @@ static Property vhost_scsi_pci_properties[] = {
+     DEFINE_PROP_END_OF_LIST(),
+ };
+ 
++static void vhost_scsi_pci_event(DeviceState *dev, int event, int queue,
++                                 Error **errp)
++{
++    VHostSCSIPCI *vscsi = VHOST_SCSI_PCI(dev);
++    DeviceState *vdev = DEVICE(&vscsi->vdev);
++
++    vhost_scsi_device_event(vdev, event, queue, errp);
++}
++
+ static void vhost_scsi_pci_realize(VirtIOPCIProxy *vpci_dev, Error **errp)
+ {
+     VHostSCSIPCI *dev = VHOST_SCSI_PCI(vpci_dev);
+@@ -70,6 +79,7 @@ static void vhost_scsi_pci_class_init(ObjectClass *klass, void *data)
+     k->realize = vhost_scsi_pci_realize;
+     set_bit(DEVICE_CATEGORY_STORAGE, dc->categories);
+     device_class_set_props(dc, vhost_scsi_pci_properties);
++    dc->event = vhost_scsi_pci_event;
+     pcidev_k->vendor_id = PCI_VENDOR_ID_REDHAT_QUMRANET;
+     pcidev_k->device_id = PCI_DEVICE_ID_VIRTIO_SCSI;
+     pcidev_k->revision = 0x00;
+diff --git a/include/hw/virtio/vhost-scsi.h b/include/hw/virtio/vhost-scsi.h
+index 7dc2bdd69d..b47854a0c6 100644
+--- a/include/hw/virtio/vhost-scsi.h
++++ b/include/hw/virtio/vhost-scsi.h
+@@ -32,4 +32,7 @@ struct VHostSCSI {
+     VHostSCSICommon parent_obj;
+ };
+ 
++void vhost_scsi_device_event(DeviceState *dev, int event, int queue,
++                             Error **errp);
++
+ #endif
+-- 
+2.17.1
+

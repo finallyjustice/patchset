@@ -1,0 +1,78 @@
+From a340c0947cbbc9cc0ff79a07c5345e91f8efec9b Mon Sep 17 00:00:00 2001
+From: Dongli Zhang <dongli.zhang@oracle.com>
+Date: Sun, 21 Mar 2021 17:46:28 -0700
+Subject: [PATCH v1 4/6] virtio-scsi-pci: implement device event interface for
+ kick/call
+
+This is to implement the device event interface for virtio-scsi-pci.
+
+Signed-off-by: Dongli Zhang <dongli.zhang@oracle.com>
+---
+ hw/scsi/virtio-scsi.c           |  9 +++++++++
+ hw/virtio/virtio-scsi-pci.c     | 10 ++++++++++
+ include/hw/virtio/virtio-scsi.h |  3 +++
+ 3 files changed, 22 insertions(+)
+
+diff --git a/hw/scsi/virtio-scsi.c b/hw/scsi/virtio-scsi.c
+index 6d80730287..f437ed1a81 100644
+--- a/hw/scsi/virtio-scsi.c
++++ b/hw/scsi/virtio-scsi.c
+@@ -962,6 +962,15 @@ static struct SCSIBusInfo virtio_scsi_scsi_info = {
+     .load_request = virtio_scsi_load_request,
+ };
+ 
++void virtio_scsi_device_event(DeviceState *dev, int event, int queue,
++                              Error **errp)
++{
++    VirtIOSCSI *s = VIRTIO_SCSI(dev);
++    bool irqfd = s->dataplane_started && !s->dataplane_fenced;
++
++    virtio_device_event(dev, event, queue, irqfd, errp);
++}
++
+ void virtio_scsi_common_realize(DeviceState *dev,
+                                 VirtIOHandleOutput ctrl,
+                                 VirtIOHandleOutput evt,
+diff --git a/hw/virtio/virtio-scsi-pci.c b/hw/virtio/virtio-scsi-pci.c
+index 97fab74236..d5db743692 100644
+--- a/hw/virtio/virtio-scsi-pci.c
++++ b/hw/virtio/virtio-scsi-pci.c
+@@ -43,6 +43,15 @@ static Property virtio_scsi_pci_properties[] = {
+     DEFINE_PROP_END_OF_LIST(),
+ };
+ 
++static void virtio_scsi_pci_event(DeviceState *dev, int event, int queue,
++                                  Error **errp)
++{
++    VirtIOSCSIPCI *vscsi = VIRTIO_SCSI_PCI(dev);
++    DeviceState *vdev = DEVICE(&vscsi->vdev);
++
++    virtio_scsi_device_event(vdev, event, queue, errp);
++}
++
+ static void virtio_scsi_pci_realize(VirtIOPCIProxy *vpci_dev, Error **errp)
+ {
+     VirtIOSCSIPCI *dev = VIRTIO_SCSI_PCI(vpci_dev);
+@@ -82,6 +91,7 @@ static void virtio_scsi_pci_class_init(ObjectClass *klass, void *data)
+     k->realize = virtio_scsi_pci_realize;
+     set_bit(DEVICE_CATEGORY_STORAGE, dc->categories);
+     device_class_set_props(dc, virtio_scsi_pci_properties);
++    dc->event = virtio_scsi_pci_event;
+     pcidev_k->vendor_id = PCI_VENDOR_ID_REDHAT_QUMRANET;
+     pcidev_k->device_id = PCI_DEVICE_ID_VIRTIO_SCSI;
+     pcidev_k->revision = 0x00;
+diff --git a/include/hw/virtio/virtio-scsi.h b/include/hw/virtio/virtio-scsi.h
+index 543681bc18..d1fff0eeac 100644
+--- a/include/hw/virtio/virtio-scsi.h
++++ b/include/hw/virtio/virtio-scsi.h
+@@ -163,4 +163,7 @@ void virtio_scsi_dataplane_setup(VirtIOSCSI *s, Error **errp);
+ int virtio_scsi_dataplane_start(VirtIODevice *s);
+ void virtio_scsi_dataplane_stop(VirtIODevice *s);
+ 
++void virtio_scsi_device_event(DeviceState *dev, int event, int queue,
++                              Error **errp);
++
+ #endif /* QEMU_VIRTIO_SCSI_H */
+-- 
+2.17.1
+

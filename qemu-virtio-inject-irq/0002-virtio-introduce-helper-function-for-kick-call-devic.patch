@@ -1,0 +1,114 @@
+From bf71421802f3a2f1be582d99a6e4791436f8894d Mon Sep 17 00:00:00 2001
+From: Dongli Zhang <dongli.zhang@oracle.com>
+Date: Thu, 25 Mar 2021 11:06:43 -0700
+Subject: [PATCH v1 2/6] virtio: introduce helper function for kick/call device
+ event
+
+This is to introduce the helper function for virtio device to kick or
+call.
+
+Signed-off-by: Dongli Zhang <dongli.zhang@oracle.com>
+---
+ hw/virtio/virtio.c         | 64 ++++++++++++++++++++++++++++++++++++++
+ include/hw/virtio/virtio.h |  3 ++
+ 2 files changed, 67 insertions(+)
+
+diff --git a/hw/virtio/virtio.c b/hw/virtio/virtio.c
+index 07f4e60b30..e081041a75 100644
+--- a/hw/virtio/virtio.c
++++ b/hw/virtio/virtio.c
+@@ -30,6 +30,8 @@
+ #include "sysemu/runstate.h"
+ #include "standard-headers/linux/virtio_ids.h"
+ 
++/* #define DEBUG_VIRTIO_EVENT */
++
+ /*
+  * The alignment to use between consumer and producer parts of vring.
+  * x86 pagesize again. This is the default, used by transports like PCI
+@@ -2572,6 +2574,68 @@ void virtio_notify(VirtIODevice *vdev, VirtQueue *vq)
+     virtio_irq(vq);
+ }
+ 
++static void virtio_device_event_call(VirtQueue *vq, bool eventfd,
++                                     Error **errp)
++{
++#ifdef DEBUG_VIRTIO_EVENT
++    printf("The 'call' event is triggered for path=%s, queue=%d, irqfd=%d.\n",
++           object_get_canonical_path(OBJECT(vq->vdev)),
++           vq->queue_index, eventfd);
++#endif
++
++    if (eventfd) {
++        virtio_set_isr(vq->vdev, 0x1);
++        event_notifier_set(&vq->guest_notifier);
++    } else {
++        virtio_irq(vq);
++    }
++}
++
++static void virtio_device_event_kick(VirtQueue *vq, bool eventfd,
++                                     Error **errp)
++{
++#ifdef DEBUG_VIRTIO_EVENT
++    printf("The 'kick' event is triggered for path=%s, queue=%d.\n",
++           object_get_canonical_path(OBJECT(vq->vdev)), vq->queue_index);
++#endif
++
++    virtio_queue_notify(vq->vdev, virtio_get_queue_index(vq));
++}
++
++typedef void (VirtIOEvent)(VirtQueue *vq, bool eventfd, Error **errp);
++
++static VirtIOEvent *virtio_event_funcs[DEVICE_EVENT_MAX] = {
++    [DEVICE_EVENT_CALL] = virtio_device_event_call,
++    [DEVICE_EVENT_KICK] = virtio_device_event_kick
++};
++
++void virtio_device_event(DeviceState *dev, int event, int queue,
++                         bool eventfd, Error **errp)
++{
++    struct VirtIODevice *vdev = VIRTIO_DEVICE(dev);
++    int num = virtio_get_num_queues(vdev);
++    VirtQueue *vq;
++
++    assert(event < DEVICE_EVENT_MAX);
++
++    if (vdev->broken) {
++        error_setg(errp, "Broken device");
++        return;
++    }
++
++    if (queue < 0 || queue >= num) {
++        error_setg(errp, "Invalid queue %d", queue);
++        return;
++    }
++
++    vq = &vdev->vq[queue];
++
++    if (virtio_event_funcs[event])
++        virtio_event_funcs[event](vq, eventfd, errp);
++    else
++        error_setg(errp, "The event is not supported");
++}
++
+ void virtio_notify_config(VirtIODevice *vdev)
+ {
+     if (!(vdev->status & VIRTIO_CONFIG_S_DRIVER_OK))
+diff --git a/include/hw/virtio/virtio.h b/include/hw/virtio/virtio.h
+index b7ece7a6a8..21bb13ffa6 100644
+--- a/include/hw/virtio/virtio.h
++++ b/include/hw/virtio/virtio.h
+@@ -210,6 +210,9 @@ void virtqueue_get_avail_bytes(VirtQueue *vq, unsigned int *in_bytes,
+ void virtio_notify_irqfd(VirtIODevice *vdev, VirtQueue *vq);
+ void virtio_notify(VirtIODevice *vdev, VirtQueue *vq);
+ 
++void virtio_device_event(DeviceState *dev, int event, int queue,
++                         bool eventfd, Error **errp);
++
+ int virtio_save(VirtIODevice *vdev, QEMUFile *f);
+ 
+ extern const VMStateInfo virtio_vmstate_info;
+-- 
+2.17.1
+

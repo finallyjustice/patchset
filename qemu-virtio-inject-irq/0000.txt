@@ -1,0 +1,160 @@
+[PATCH v1 0/6] Add debug interface to kick/call on purpose
+
+The virtio device/driver (e.g., vhost-scsi or vhost-net) may hang due to
+the loss of doorbell kick, e.g.,
+
+https://lists.gnu.org/archive/html/qemu-devel/2018-12/msg01711.html
+
+... or due to the loss of IRQ, e.g., as fixed by linux kernel commit
+fe200ae48ef5 ("genirq: Mark polled irqs and defer the real handler").
+
+This patch introduces a new debug interface 'DeviceEvent' to DeviceClass
+to help narrow down if the issue is due to loss of irq/kick. So far the new
+interface handles only two events: 'call' and 'kick'. Any device (e.g.,
+virtio/vhost or VFIO) may implement the interface (e.g., via eventfd, MSI-X
+or legacy IRQ).
+
+The 'call' is to inject irq on purpose by admin for a specific device (e.g.,
+vhost-scsi) from QEMU/host to VM, while the 'kick' is to kick the doorbell
+on purpose by admin at QEMU/host side for a specific device.
+
+
+This device can be used as a workaround if call/kick is lost due to
+virtualization software (e.g., kernel or QEMU) issue.
+
+We may also implement the interface for VFIO PCI, e.g., to write to
+VFIOPCIDevice->msi_vectors[i].interrupt will be able to inject IRQ to VM
+on purpose. This is considered future work once the virtio part is done.
+
+
+Below is from live crash analysis. Initially, the queue=2 has count=15 for
+'kick' eventfd_ctx. Suppose there is data in vring avail while there is no
+used available. We suspect this is because vhost-scsi was not notified by
+VM. In order to narrow down and analyze the issue, we use live crash to
+dump the current counter of eventfd for queue=2.
+
+crash> eventfd_ctx ffff8f67f6bbe700
+struct eventfd_ctx {
+  kref = {
+    refcount = {
+      refs = {
+        counter = 4
+      }
+    }
+  }, 
+  wqh = {
+    lock = {
+      {
+        rlock = {
+          raw_lock = {
+            val = {
+              counter = 0
+            }
+          }
+        }
+      }
+    }, 
+    head = {
+      next = 0xffff8f841dc08e18, 
+      prev = 0xffff8f841dc08e18
+    }
+  }, 
+  count = 15, ---> eventfd is 15 !!!
+  flags = 526336
+}
+
+Now we kick the doorbell for vhost-scsi queue=2 on purpose for diagnostic
+with this interface.
+
+{ "execute": "x-debug-device-event",
+  "arguments": { "dev": "/machine/peripheral/vscsi0",
+                 "event": "kick", "queue": 2 } }
+
+The counter is increased to 16. Suppose the hang issue is resolved, it
+indicates something bad is in software that the 'kick' is lost.
+
+crash> eventfd_ctx ffff8f67f6bbe700
+struct eventfd_ctx {
+  kref = {
+    refcount = {
+      refs = {
+        counter = 4
+      }
+    }
+  },
+  wqh = {
+    lock = {
+      {
+        rlock = {
+          raw_lock = {
+            val = {
+              counter = 0
+            }
+          }
+        }
+      }
+    },
+    head = {
+      next = 0xffff8f841dc08e18,
+      prev = 0xffff8f841dc08e18
+    }
+  },
+  count = 16, ---> eventfd incremented to 16 !!!
+  flags = 526336
+}
+
+
+Original RFC link:
+
+https://lists.nongnu.org/archive/html/qemu-devel/2021-01/msg03441.html
+
+Changed since RFC:
+  - add support for more virtio/vhost pci devices
+  - add log (toggled by DEBUG_VIRTIO_EVENT) to virtio.c to say that this 
+    mischeivous command had been used
+  - fix grammer error (s/lost/loss/)
+  - change version to 6.1
+  - fix incorrect example in qapi/qdev.json
+  - manage event types with enum/array, instead of hard coding
+
+
+Dongli Zhang (6):
+   qdev: introduce qapi/hmp command for kick/call event
+   virtio: introduce helper function for kick/call device event
+   virtio-blk-pci: implement device event interface for kick/call
+   virtio-scsi-pci: implement device event interface for kick/call
+   vhost-scsi-pci: implement device event interface for kick/call
+   virtio-net-pci: implement device event interface for kick/call
+
+ hmp-commands.hx                 | 14 ++++++++
+ hw/block/virtio-blk.c           |  9 +++++
+ hw/net/virtio-net.c             |  9 +++++
+ hw/scsi/vhost-scsi.c            |  6 ++++
+ hw/scsi/virtio-scsi.c           |  9 +++++
+ hw/virtio/vhost-scsi-pci.c      | 10 ++++++
+ hw/virtio/virtio-blk-pci.c      | 10 ++++++
+ hw/virtio/virtio-net-pci.c      | 10 ++++++
+ hw/virtio/virtio-scsi-pci.c     | 10 ++++++
+ hw/virtio/virtio.c              | 64 ++++++++++++++++++++++++++++++++++++
+ include/hw/qdev-core.h          |  9 +++++
+ include/hw/virtio/vhost-scsi.h  |  3 ++
+ include/hw/virtio/virtio-blk.h  |  2 ++
+ include/hw/virtio/virtio-net.h  |  3 ++
+ include/hw/virtio/virtio-scsi.h |  3 ++
+ include/hw/virtio/virtio.h      |  3 ++
+ include/monitor/hmp.h           |  1 +
+ qapi/qdev.json                  | 30 +++++++++++++++++
+ softmmu/qdev-monitor.c          | 56 +++++++++++++++++++++++++++++++
+ 19 files changed, 261 insertions(+)
+
+
+I did tests with below cases.
+
+- virtio-blk-pci (ioeventfd on/off, iothread, live migration)
+- virtio-scsi-pci (ioeventfd on/off)
+- vhost-scsi-pci
+- virtio-net-pci (ioeventfd on/off, vhost)
+
+Thank you very much!
+
+Dongli Zhang

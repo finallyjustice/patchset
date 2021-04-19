@@ -1,0 +1,203 @@
+From ea2a198f49fc1ad74b2956ef5e3ef960e78fa371 Mon Sep 17 00:00:00 2001
+From: Dongli Zhang <dongli.zhang@oracle.com>
+Date: Thu, 25 Mar 2021 12:42:16 -0700
+Subject: [PATCH v1 1/6] qdev: introduce qapi/hmp command for kick/call event
+
+The virtio device/driver (e.g., vhost-scsi or vhost-net) may hang due to
+the loss of doorbell kick, e.g.,
+
+https://lists.gnu.org/archive/html/qemu-devel/2018-12/msg01711.html
+
+... or due to the loss of IRQ, e.g., as fixed by linux kernel commit
+fe200ae48ef5 ("genirq: Mark polled irqs and defer the real handler").
+
+This patch introduces a new debug interface 'DeviceEvent' to DeviceClass
+to help narrow down if the issue is due to loss of irq/kick. So far the new
+interface handles only two events: 'call' and 'kick'. Any device (e.g.,
+virtio/vhost or VFIO) may implement the interface (e.g., via eventfd, MSI-X
+or legacy IRQ).
+
+The 'call' is to inject irq on purpose by admin for a specific device (e.g.,
+vhost-scsi) from QEMU/host to VM, while the 'kick' is to kick the doorbell
+on purpose by admin at QEMU/host side for a specific device.
+
+Signed-off-by: Dongli Zhang <dongli.zhang@oracle.com>
+---
+ hmp-commands.hx        | 14 +++++++++++
+ include/hw/qdev-core.h |  9 +++++++
+ include/monitor/hmp.h  |  1 +
+ qapi/qdev.json         | 30 ++++++++++++++++++++++
+ softmmu/qdev-monitor.c | 56 ++++++++++++++++++++++++++++++++++++++++++
+ 5 files changed, 110 insertions(+)
+
+diff --git a/hmp-commands.hx b/hmp-commands.hx
+index 435c591a1c..d74b895fff 100644
+--- a/hmp-commands.hx
++++ b/hmp-commands.hx
+@@ -1725,3 +1725,17 @@ ERST
+         .flags      = "p",
+     },
+ 
++    {
++        .name       = "x-debug-device-event",
++        .args_type  = "dev:s,event:s,queue:l",
++        .params     = "dev event queue",
++        .help       = "generate device event for a specific device queue",
++        .cmd        = hmp_x_debug_device_event,
++        .flags      = "p",
++    },
++
++SRST
++``x-debug-device-event`` *dev* *event* *queue*
++  Generate device event *event* for specific *queue* of *dev*
++ERST
++
+diff --git a/include/hw/qdev-core.h b/include/hw/qdev-core.h
+index bafc311bfa..1ea8bf23b9 100644
+--- a/include/hw/qdev-core.h
++++ b/include/hw/qdev-core.h
+@@ -29,9 +29,17 @@ typedef enum DeviceCategory {
+     DEVICE_CATEGORY_MAX
+ } DeviceCategory;
+ 
++enum {
++    DEVICE_EVENT_CALL,
++    DEVICE_EVENT_KICK,
++    DEVICE_EVENT_MAX
++};
++
+ typedef void (*DeviceRealize)(DeviceState *dev, Error **errp);
+ typedef void (*DeviceUnrealize)(DeviceState *dev);
+ typedef void (*DeviceReset)(DeviceState *dev);
++typedef void (*DeviceEvent)(DeviceState *dev, int event, int queue,
++                            Error **errp);
+ typedef void (*BusRealize)(BusState *bus, Error **errp);
+ typedef void (*BusUnrealize)(BusState *bus);
+ 
+@@ -132,6 +140,7 @@ struct DeviceClass {
+     DeviceReset reset;
+     DeviceRealize realize;
+     DeviceUnrealize unrealize;
++    DeviceEvent event;
+ 
+     /* device state */
+     const VMStateDescription *vmsd;
+diff --git a/include/monitor/hmp.h b/include/monitor/hmp.h
+index 605d57287a..c7795d4ba5 100644
+--- a/include/monitor/hmp.h
++++ b/include/monitor/hmp.h
+@@ -129,5 +129,6 @@ void hmp_info_replay(Monitor *mon, const QDict *qdict);
+ void hmp_replay_break(Monitor *mon, const QDict *qdict);
+ void hmp_replay_delete_break(Monitor *mon, const QDict *qdict);
+ void hmp_replay_seek(Monitor *mon, const QDict *qdict);
++void hmp_x_debug_device_event(Monitor *mon, const QDict *qdict);
+ 
+ #endif
+diff --git a/qapi/qdev.json b/qapi/qdev.json
+index b83178220b..711c4a297a 100644
+--- a/qapi/qdev.json
++++ b/qapi/qdev.json
+@@ -124,3 +124,33 @@
+ ##
+ { 'event': 'DEVICE_DELETED',
+   'data': { '*device': 'str', 'path': 'str' } }
++
++##
++# @x-debug-device-event:
++#
++# Generate device event for a specific device queue
++#
++# @dev: device path
++#
++# @event: event (e.g., kick or call) to trigger
++#
++# @queue: queue id
++#
++# Returns: Nothing on success
++#
++# Since: 6.1
++#
++# Notes: This is used to debug VM driver hang issue. The 'kick' event is to
++#        send notification to QEMU/vhost while the 'call' event is to
++#        interrupt VM on purpose.
++#
++# Example:
++#
++# -> { "execute": "x-debug-device_event",
++#      "arguments": { "dev": "/machine/peripheral/vscsi0", "event": "kick",
++#                     "queue": 1 } }
++# <- { "return": {} }
++#
++##
++{ 'command': 'x-debug-device-event',
++  'data': {'dev': 'str', 'event': 'str', 'queue': 'int'} }
+diff --git a/softmmu/qdev-monitor.c b/softmmu/qdev-monitor.c
+index a9955b97a0..bca53111fb 100644
+--- a/softmmu/qdev-monitor.c
++++ b/softmmu/qdev-monitor.c
+@@ -924,6 +924,62 @@ void hmp_device_del(Monitor *mon, const QDict *qdict)
+     hmp_handle_error(mon, err);
+ }
+ 
++static const char * const device_events[DEVICE_EVENT_MAX] = {
++    [DEVICE_EVENT_KICK] = "kick",
++    [DEVICE_EVENT_CALL] = "call"
++};
++
++static int get_device_event(const char *event)
++{
++    int evt;
++
++    for (evt = 0; evt < ARRAY_SIZE(device_events); evt++) {
++        if (!strcmp(device_events[evt], event)) {
++            return evt;
++        }
++    }
++
++    return -ENOENT;
++}
++
++void qmp_x_debug_device_event(const char *dev, const char *event,
++                              int64_t queue, Error **errp)
++{
++    DeviceState *device = find_device_state(dev, NULL);
++    DeviceClass *dc;
++    int evt;
++
++    if (!device) {
++        error_setg(errp, "Device %s not found", dev);
++        return;
++    }
++
++    dc = DEVICE_GET_CLASS(device);
++    if (!dc->event) {
++        error_setg(errp, "device_event is not supported");
++        return;
++    }
++
++    evt = get_device_event(event);
++    if (evt < 0) {
++        error_setg(errp, "Unsupported event %s", event);
++        return;
++    }
++
++    dc->event(device, evt, queue, errp);
++}
++
++void hmp_x_debug_device_event(Monitor *mon, const QDict *qdict)
++{
++    const char *dev = qdict_get_str(qdict, "dev");
++    const char *event = qdict_get_str(qdict, "event");
++    int queue = qdict_get_try_int(qdict, "queue", -1);
++    Error *err = NULL;
++
++    qmp_x_debug_device_event(dev, event, queue, &err);
++    hmp_handle_error(mon, err);
++}
++
+ BlockBackend *blk_by_qdev_id(const char *id, Error **errp)
+ {
+     DeviceState *dev;
+-- 
+2.17.1
+
