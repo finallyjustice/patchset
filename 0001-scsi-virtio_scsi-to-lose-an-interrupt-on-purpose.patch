@@ -1,0 +1,111 @@
+From 8c60d975887583b9abb24b47e4f30a7309df206d Mon Sep 17 00:00:00 2001
+From: Dongli Zhang <dongli.zhang@oracle.com>
+Date: Wed, 19 May 2021 10:32:44 -0700
+Subject: [PATCH v5.12 1/1] scsi: virtio_scsi: to lose an interrupt on purpose
+
+This is on top of v5.12.
+
+This is to ignore an interrupt on purpose to emulate the loss of interrupt
+issue for virtio-scsi.
+
+vm# echo 1 > /sys/kernel/testsys
+[   64.463746] testsys: testsys_debug is set to 1
+
+vm# dd if=/dev/sda of=disk.img bs=4K count=20 oflag=direct
+
+[  113.850136] virtio_scsi: orabug: to lose one interrupt for QID 3
+
+Signed-off-by: Dongli Zhang <dongli.zhang@oracle.com>
+---
+ block/blk-mq.c             | 40 ++++++++++++++++++++++++++++++++++++++
+ drivers/scsi/virtio_scsi.c |  9 +++++++++
+ 2 files changed, 49 insertions(+)
+
+diff --git a/block/blk-mq.c b/block/blk-mq.c
+index d4d7c1caa439..0193d80a480f 100644
+--- a/block/blk-mq.c
++++ b/block/blk-mq.c
+@@ -3925,6 +3925,43 @@ unsigned int blk_mq_rq_cpu(struct request *rq)
+ }
+ EXPORT_SYMBOL(blk_mq_rq_cpu);
+ 
++int testsys_debug = 0;
++
++static ssize_t
++testsys_show(struct kobject *kobj,
++	     struct kobj_attribute *attr,
++	     char *buf)
++{
++	return sprintf(buf, "%d\n", testsys_debug);
++}
++
++static ssize_t
++testsys_store(struct kobject *kobj,
++	      struct kobj_attribute *attr,
++	      const char *buf, size_t count)
++{
++	sscanf(buf, "%d", &testsys_debug);
++	pr_alert("testsys: testsys_debug is set to %d\n", testsys_debug);
++
++	return count;
++}
++
++static struct kobj_attribute testsys_attr =
++	__ATTR(testsys, 0600,
++	       testsys_show,
++	       testsys_store);
++
++static void testsys_register(void)
++{
++	int ret;
++
++	ret = sysfs_create_file(kernel_kobj, &testsys_attr.attr);
++	if (ret)
++		pr_alert("testsys: failed to create testsys\n");
++	else
++		pr_alert("testsys: the testsys is created successfully\n");
++}
++
+ static int __init blk_mq_init(void)
+ {
+ 	int i;
+@@ -3941,6 +3978,9 @@ static int __init blk_mq_init(void)
+ 	cpuhp_setup_state_multi(CPUHP_AP_BLK_MQ_ONLINE, "block/mq:online",
+ 				blk_mq_hctx_notify_online,
+ 				blk_mq_hctx_notify_offline);
++
++	testsys_register();
++
+ 	return 0;
+ }
+ subsys_initcall(blk_mq_init);
+diff --git a/drivers/scsi/virtio_scsi.c b/drivers/scsi/virtio_scsi.c
+index b9c86a7e3b97..13da973f9abc 100644
+--- a/drivers/scsi/virtio_scsi.c
++++ b/drivers/scsi/virtio_scsi.c
+@@ -189,6 +189,8 @@ static void virtscsi_vq_done(struct virtio_scsi *vscsi,
+ 	spin_unlock_irqrestore(&virtscsi_vq->vq_lock, flags);
+ }
+ 
++extern int testsys_debug;
++
+ static void virtscsi_req_done(struct virtqueue *vq)
+ {
+ 	struct Scsi_Host *sh = virtio_scsi_host(vq->vdev);
+@@ -196,6 +198,13 @@ static void virtscsi_req_done(struct virtqueue *vq)
+ 	int index = vq->index - VIRTIO_SCSI_VQ_BASE;
+ 	struct virtio_scsi_vq *req_vq = &vscsi->req_vqs[index];
+ 
++	 if (testsys_debug) {
++		testsys_debug = 0;
++		pr_alert("orabug: to lose one interrupt for QID %d\n",
++			 vq->index);
++		return;
++	 }
++
+ 	virtscsi_vq_done(vscsi, req_vq, virtscsi_complete_cmd);
+ };
+ 
+-- 
+2.17.1
+
