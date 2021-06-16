@@ -1,0 +1,287 @@
+From 8294c3941546c06b8569bd66bf4baa3fe57e0387 Mon Sep 17 00:00:00 2001
+From: oracle <dongli.zhang@oracle.com>
+Date: Tue, 15 Jun 2021 23:15:40 -0700
+Subject: [PATCH 1/1] qemu: to dump exits via binary interface
+
+This is to query from binary stat interface via below:
+
+https://lore.kernel.org/kvm/ad7905f9-8338-382a-b1df-9b3352bbd2f8@redhat.com/T/#t
+
+# ./qemu-system-x86_64 -hda ol7.qcow2 -m 2G -smp 4 -vnc :0 -enable-kvm -monitor stdio
+QEMU 6.0.0 monitor - type 'help' for more information
+
+(qemu) info kvmstat
+remote_tlb_flush: 14
+mmu_shadow_zapped: 386
+mmu_pte_write: 0
+mmu_pde_zapped: 0
+mmu_flooded: 0
+mmu_recycled: 0
+mmu_cache_miss: 569
+mmu_unsync: 0
+lpages: 0
+nx_lpage_splits: 0
+max_mmu_page_hash_collisions: 0
+
+VCPU 0:
+  exits = 986751
+
+VCPU 1:
+  exits = 164022
+
+VCPU 2:
+  exits = 84567
+
+VCPU 3:
+  exits = 99140
+
+... ... --> wait for a while
+
+
+(qemu) info kvmstat 
+remote_tlb_flush: 14
+mmu_shadow_zapped: 386
+mmu_pte_write: 0
+mmu_pde_zapped: 0
+mmu_flooded: 0
+mmu_recycled: 0
+mmu_cache_miss: 569
+mmu_unsync: 0
+lpages: 0
+nx_lpage_splits: 0
+max_mmu_page_hash_collisions: 0
+
+VCPU 0:
+  exits = 989148
+
+VCPU 1:
+  exits = 164302
+
+VCPU 2:
+  exits = 84788
+
+VCPU 3:
+  exits = 99685
+
+Signed-off-by: oracle <dongli.zhang@oracle.com>
+---
+ accel/kvm/kvm-all.c   | 145 ++++++++++++++++++++++++++++++++++++++++++
+ hmp-commands-info.hx  |  13 ++++
+ include/hw/core/cpu.h |   1 +
+ include/monitor/hmp.h |   1 +
+ 4 files changed, 160 insertions(+)
+
+diff --git a/accel/kvm/kvm-all.c b/accel/kvm/kvm-all.c
+index b6d9f92f1..4fbc5728a 100644
+--- a/accel/kvm/kvm-all.c
++++ b/accel/kvm/kvm-all.c
+@@ -49,6 +49,9 @@
+ 
+ #include "hw/boards.h"
+ 
++#include "monitor/hmp.h"
++#include "monitor/monitor.h"
++
+ /* This check must be after config-host.h is included */
+ #ifdef CONFIG_EVENTFD
+ #include <sys/eventfd.h>
+@@ -3016,6 +3019,148 @@ int kvm_on_sigbus(int code, void *addr)
+ #endif
+ }
+ 
++#define KVM_STATS_ID_MAXLEN             64
++
++struct kvm_stats_header {
++    __u32 name_size;
++    __u32 count;
++    __u32 desc_offset;
++    __u32 data_offset;
++    char id[0];
++};
++
++struct kvm_stats_desc {
++    __u32 flags;
++    __s16 exponent;
++    __u16 size;
++    __u32 offset;
++    __u32 unused;
++    char name[0];
++};
++
++struct kvm_stats_data {
++    __u64 value[0];
++};
++
++#define KVM_GET_STATS_FD  _IO(KVMIO,  0xce)
++
++static int vm_get_stats_fd(void)
++{
++    KVMState *s = kvm_state;
++
++    return ioctl(s->vmfd, KVM_GET_STATS_FD, NULL);
++}
++
++static void kvmstat_vm(Monitor *mon)
++{
++    ssize_t ret;
++    int i;
++    int stats_fd;
++    size_t size_desc, size_data = 0;
++    struct kvm_stats_header *header;
++    struct kvm_stats_desc *stats_desc, *pdesc;
++    struct kvm_stats_data *stats_data;
++    size_t size_header = sizeof(*header) + KVM_STATS_ID_MAXLEN;
++
++    stats_fd = vm_get_stats_fd();
++    header = g_malloc(size_header);
++    ret = read(stats_fd, header, size_header);
++    assert(ret >= 0);
++
++    size_desc = sizeof(*stats_desc) + header->name_size;
++    stats_desc = g_malloc(header->count * size_desc);
++    ret = pread(stats_fd, stats_desc,
++                size_desc * header->count, header->desc_offset);
++    assert(ret >= 0);
++
++    for (i = 0; i < header->count; ++i) {
++        pdesc = (void *)stats_desc + i * size_desc;
++        size_data = pdesc->size * sizeof(stats_data->value[0]);
++        stats_data = g_malloc(size_data);
++
++        ret = pread(stats_fd, stats_data, size_data,
++                    header->data_offset + pdesc->offset);
++        assert(ret >= 0);
++        monitor_printf(mon, "%s: %llu\n", pdesc->name, stats_data->value[0]);
++        g_free(stats_data);
++    }
++
++    g_free(stats_desc);
++    g_free(header);
++
++    close(stats_fd);
++}
++
++static int vcpu_get_stats_fd(CPUState *cs)
++{
++    return kvm_vcpu_ioctl(CPU(cs), KVM_GET_STATS_FD, NULL);
++}
++
++static void kvmstat_vcpu(CPUState *cpu, run_on_cpu_data data)
++{
++    ssize_t ret;
++    int i;
++    int stats_fd;
++    size_t size_desc, size_data = 0;
++    struct kvm_stats_header *header;
++    struct kvm_stats_desc *stats_desc, *pdesc;
++    struct kvm_stats_data *stats_data;
++    size_t size_header = sizeof(*header) + KVM_STATS_ID_MAXLEN;
++
++    stats_fd = vcpu_get_stats_fd(cpu);
++    header = g_malloc(size_header);
++    ret = read(stats_fd, header, size_header);
++    assert(ret >= 0);
++
++
++    size_desc = sizeof(*stats_desc) + header->name_size;
++    stats_desc = g_malloc(header->count * size_desc);
++    ret = pread(stats_fd, stats_desc,
++                size_desc * header->count, header->desc_offset);
++    assert(ret >= 0);
++
++    for (i = 0; i < header->count; ++i) {
++        pdesc = (void *)stats_desc + i * size_desc;
++	size_data = pdesc->size * sizeof(stats_data->value[0]);
++	stats_data = g_malloc(size_data);
++
++	ret = pread(stats_fd, stats_data, size_data,
++                    header->data_offset + pdesc->offset);
++        assert(ret >= 0);
++
++	if (!strcmp("exits", pdesc->name))
++            cpu->kvm_exits = stats_data->value[0];
++
++	// printf("%s: %llu\n", pdesc->name, stats_data->value[0]);
++	g_free(stats_data);
++    }
++
++    g_free(stats_desc);
++    g_free(header);
++
++    close(stats_fd);
++}
++
++static void kvmstat_vcpus(Monitor *mon)
++{
++    CPUState *cpu;
++
++    CPU_FOREACH(cpu) {
++        monitor_printf(mon, "\nVCPU %u:\n", cpu->cpu_index);
++        run_on_cpu(cpu, kvmstat_vcpu, RUN_ON_CPU_NULL);
++        monitor_printf(mon, "  exits = %lu\n", cpu->kvm_exits);
++    }
++}
++
++void hmp_info_kvmstat(Monitor *mon, const QDict *qdict)
++{
++    if (!kvm_enabled())
++        return;
++
++    kvmstat_vm(mon);
++    kvmstat_vcpus(mon);
++}
++
+ int kvm_create_device(KVMState *s, uint64_t type, bool test)
+ {
+     int ret;
+diff --git a/hmp-commands-info.hx b/hmp-commands-info.hx
+index ab0c7aa5e..e5ead1564 100644
+--- a/hmp-commands-info.hx
++++ b/hmp-commands-info.hx
+@@ -337,6 +337,19 @@ SRST
+     Show KVM information.
+ ERST
+ 
++    {
++        .name       = "kvmstat",
++        .args_type  = "",
++        .params     = "",
++        .help       = "show KVM statistics",
++        .cmd        = hmp_info_kvmstat,
++    },
++
++SRST
++  ``info kvmstat``
++    Show KVM statistics.
++ERST
++
+     {
+         .name       = "numa",
+         .args_type  = "",
+diff --git a/include/hw/core/cpu.h b/include/hw/core/cpu.h
+index c68bc3ba8..18b005202 100644
+--- a/include/hw/core/cpu.h
++++ b/include/hw/core/cpu.h
+@@ -397,6 +397,7 @@ struct CPUState {
+     int kvm_fd;
+     struct KVMState *kvm_state;
+     struct kvm_run *kvm_run;
++    unsigned long kvm_exits;
+ 
+     /* Used for events with 'vcpu' and *without* the 'disabled' properties */
+     DECLARE_BITMAP(trace_dstate_delayed, CPU_TRACE_DSTATE_MAX_EVENTS);
+diff --git a/include/monitor/hmp.h b/include/monitor/hmp.h
+index 605d57287..9a5a24161 100644
+--- a/include/monitor/hmp.h
++++ b/include/monitor/hmp.h
+@@ -21,6 +21,7 @@ void hmp_handle_error(Monitor *mon, Error *err);
+ void hmp_info_name(Monitor *mon, const QDict *qdict);
+ void hmp_info_version(Monitor *mon, const QDict *qdict);
+ void hmp_info_kvm(Monitor *mon, const QDict *qdict);
++void hmp_info_kvmstat(Monitor *mon, const QDict *qdict);
+ void hmp_info_status(Monitor *mon, const QDict *qdict);
+ void hmp_info_uuid(Monitor *mon, const QDict *qdict);
+ void hmp_info_chardev(Monitor *mon, const QDict *qdict);
+-- 
+2.17.1
+
