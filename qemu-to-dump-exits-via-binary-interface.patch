@@ -3,7 +3,8 @@ From: oracle <dongli.zhang@oracle.com>
 Date: Tue, 15 Jun 2021 23:15:40 -0700
 Subject: [PATCH 1/1] qemu: to dump exits via binary interface
 
-This is to query from binary stat interface via below:
+This is to query from binary stat interface via below (based on
+qemu-6.0.0):
 
 https://lore.kernel.org/kvm/ad7905f9-8338-382a-b1df-9b3352bbd2f8@redhat.com/T/#t
 
