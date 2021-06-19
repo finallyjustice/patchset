@@ -1,0 +1,87 @@
+From a7c5d1f304e99957dabfe2ed70908c7e2869145c Mon Sep 17 00:00:00 2001
+From: Dongli Zhang <dongli.zhang@oracle.com>
+Date: Fri, 18 Jun 2021 15:50:16 -0700
+Subject: [PATCH 1/1] kvm: export vcpu data via debugfs
+
+This is on top of stable linux-4.18.12, as a templete to export KVM VM
+percpu data via debugfs.
+
+The template demonstrate how to export vcpu data via debugfs. Here is an
+example.
+
+hypervisor# cat /sys/kernel/debug/kvm/2490-11/vcpu*/vcpu-diag
+pid = 2490, cpu = 5, index = 0
+ exits = 782944
+pid = 2490, cpu = 2, index = 1
+ exits = 124065
+pid = 2490, cpu = 6, index = 2
+ exits = 128033
+pid = 2490, cpu = 3, index = 3
+ exits = 130418
+
+... wait for a while ...
+
+hypervisor# cat /sys/kernel/debug/kvm/2490-11/vcpu*/vcpu-diag
+pid = 2490, cpu = 5, index = 0
+ exits = 785821
+pid = 2490, cpu = 2, index = 1
+ exits = 131513
+pid = 2490, cpu = 6, index = 2
+ exits = 128695
+pid = 2490, cpu = 3, index = 3
+ exits = 131179
+
+Signed-off-by: Dongli Zhang <dongli.zhang@oracle.com>
+---
+ arch/x86/kvm/debugfs.c | 29 +++++++++++++++++++++++++++++
+ 1 file changed, 29 insertions(+)
+
+diff --git a/arch/x86/kvm/debugfs.c b/arch/x86/kvm/debugfs.c
+index c19c7ed..8646c31 100644
+--- a/arch/x86/kvm/debugfs.c
++++ b/arch/x86/kvm/debugfs.c
+@@ -41,6 +41,30 @@ static int vcpu_get_tsc_scaling_frac_bits(void *data, u64 *val)
+ 
+ DEFINE_SIMPLE_ATTRIBUTE(vcpu_tsc_scaling_frac_fops, vcpu_get_tsc_scaling_frac_bits, NULL, "%llu\n");
+ 
++static int kvm_vcpu_diag_info(struct seq_file *m, void *v)
++{
++	struct kvm_vcpu *vcpu = m->private;
++
++	seq_printf(m, "pid = %d, cpu = %d, index = %d\n",
++		   vcpu->kvm->userspace_pid, vcpu->cpu, vcpu->vcpu_id);
++	seq_printf(m, " exits = %llu\n", vcpu->stat.exits);
++
++	return 0;
++}
++
++static int kvm_vcpu_diag_open(struct inode *inode, struct file *filp)
++{
++	return single_open(filp, kvm_vcpu_diag_info, inode->i_private);
++}
++
++static const struct file_operations kvm_vcpu_diag_fops = {
++	.owner = THIS_MODULE,
++	.open = kvm_vcpu_diag_open,
++	.read = seq_read,
++	.llseek = seq_lseek,
++	.release = single_release,
++};
++
+ int kvm_arch_create_vcpu_debugfs(struct kvm_vcpu *vcpu)
+ {
+ 	struct dentry *ret;
+@@ -65,5 +89,10 @@ int kvm_arch_create_vcpu_debugfs(struct kvm_vcpu *vcpu)
+ 
+ 	}
+ 
++	ret = debugfs_create_file("vcpu-diag", 0444, vcpu->debugfs_dentry,
++				  vcpu, &kvm_vcpu_diag_fops);
++	if (!ret)
++		return -ENOMEM;
++
+ 	return 0;
+ }
+-- 
+1.8.3.1
+
