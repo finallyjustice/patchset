@@ -1,0 +1,121 @@
+From 2792180f518555190af800ab614a2182aa93f8d6 Mon Sep 17 00:00:00 2001
+From: Dongli Zhang <dongli.zhang@oracle.com>
+Date: Sat, 3 Jul 2021 21:22:41 -0700
+Subject: [PATCH linux 1/1] pvpanic: add reboot and shutdown events
+
+This is based on linux-5.13.
+
+Currently the pvpanic support both 'panicked' and 'crashloaded' events.
+This is to add extra 'reboot' and 'shutdown' events.
+
+Signed-off-by: Dongli Zhang <dongli.zhang@oracle.com>
+---
+ drivers/misc/pvpanic/pvpanic-mmio.c |  2 +-
+ drivers/misc/pvpanic/pvpanic-pci.c  |  2 +-
+ drivers/misc/pvpanic/pvpanic.c      | 27 +++++++++++++++++++++++++++
+ include/uapi/misc/pvpanic.h         |  5 +++++
+ 4 files changed, 34 insertions(+), 2 deletions(-)
+
+diff --git a/drivers/misc/pvpanic/pvpanic-mmio.c b/drivers/misc/pvpanic/pvpanic-mmio.c
+index 4c08417..c5c987e 100644
+--- a/drivers/misc/pvpanic/pvpanic-mmio.c
++++ b/drivers/misc/pvpanic/pvpanic-mmio.c
+@@ -98,7 +98,7 @@ static int pvpanic_mmio_probe(struct platform_device *pdev)
+ 		return -ENOMEM;
+ 
+ 	pi->base = base;
+-	pi->capability = PVPANIC_PANICKED | PVPANIC_CRASH_LOADED;
++	pi->capability = PVPANIC_DEFAULT;
+ 
+ 	/* initlize capability by RDPT */
+ 	pi->capability &= ioread8(base);
+diff --git a/drivers/misc/pvpanic/pvpanic-pci.c b/drivers/misc/pvpanic/pvpanic-pci.c
+index 9ecc4e8..7613aba 100644
+--- a/drivers/misc/pvpanic/pvpanic-pci.c
++++ b/drivers/misc/pvpanic/pvpanic-pci.c
+@@ -91,7 +91,7 @@ static int pvpanic_pci_probe(struct pci_dev *pdev,
+ 		return -ENOMEM;
+ 
+ 	pi->base = base;
+-	pi->capability = PVPANIC_PANICKED | PVPANIC_CRASH_LOADED;
++	pi->capability = PVPANIC_DEFAULT;
+ 
+ 	/* initlize capability by RDPT */
+ 	pi->capability &= ioread8(base);
+diff --git a/drivers/misc/pvpanic/pvpanic.c b/drivers/misc/pvpanic/pvpanic.c
+index 65f70a4..f068ad0 100644
+--- a/drivers/misc/pvpanic/pvpanic.c
++++ b/drivers/misc/pvpanic/pvpanic.c
+@@ -16,6 +16,7 @@
+ #include <linux/types.h>
+ #include <linux/cdev.h>
+ #include <linux/list.h>
++#include <linux/reboot.h>
+ 
+ #include <uapi/misc/pvpanic.h>
+ 
+@@ -60,6 +61,29 @@
+ 	.priority = 1, /* let this called before broken drm_fb_helper */
+ };
+ 
++static int
++pvpanic_reboot_notify(struct notifier_block *nb, unsigned long code,
++		      void *unused)
++{
++	switch (code) {
++	case SYS_POWER_OFF:
++		pvpanic_send_event(PVPANIC_SHUTDOWN);
++		break;
++	case SYS_RESTART:
++		pvpanic_send_event(PVPANIC_REBOOT);
++		break;
++	default:
++		break;
++	}
++
++	return NOTIFY_DONE;
++}
++
++static struct notifier_block pvpanic_reboot_nb = {
++	.notifier_call = pvpanic_reboot_notify,
++	.priority = 1,
++};
++
+ int pvpanic_probe(struct pvpanic_instance *pi)
+ {
+ 	if (!pi || !pi->base)
+@@ -99,6 +123,8 @@ static int pvpanic_init(void)
+ 	atomic_notifier_chain_register(&panic_notifier_list,
+ 				       &pvpanic_panic_nb);
+ 
++	register_reboot_notifier(&pvpanic_reboot_nb);
++
+ 	return 0;
+ }
+ 
+@@ -107,6 +133,7 @@ static void pvpanic_exit(void)
+ 	atomic_notifier_chain_unregister(&panic_notifier_list,
+ 					 &pvpanic_panic_nb);
+ 
++	unregister_reboot_notifier(&pvpanic_reboot_nb);
+ }
+ 
+ module_init(pvpanic_init);
+diff --git a/include/uapi/misc/pvpanic.h b/include/uapi/misc/pvpanic.h
+index 54b7485..da6136c 100644
+--- a/include/uapi/misc/pvpanic.h
++++ b/include/uapi/misc/pvpanic.h
+@@ -5,5 +5,10 @@
+ 
+ #define PVPANIC_PANICKED	(1 << 0)
+ #define PVPANIC_CRASH_LOADED	(1 << 1)
++#define PVPANIC_REBOOT		(1 << 2)
++#define PVPANIC_SHUTDOWN	(1 << 3)
++
++#define PVPANIC_DEFAULT		(PVPANIC_PANICKED | PVPANIC_CRASH_LOADED | \
++				 PVPANIC_REBOOT | PVPANIC_SHUTDOWN)
+ 
+ #endif /* __PVPANIC_H__ */
+-- 
+1.8.3.1
+

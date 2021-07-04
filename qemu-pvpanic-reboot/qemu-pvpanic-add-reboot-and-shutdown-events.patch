@@ -1,0 +1,197 @@
+From ec93a31d70040c7b2c8e53b0111d132da9c99f1e Mon Sep 17 00:00:00 2001
+From: Dongli Zhang <dongli.zhang@oracle.com>
+Date: Sat, 3 Jul 2021 20:08:59 -0700
+Subject: [PATCH qemu 1/1] pvpanic: add reboot and shutdown events
+
+This is based on qemu commit 1ec2cd0ce2ca ("Merge remote-tracking branch
+'remotes/nvme/tags/nvme-next-pull-request' into staging").
+
+Currently the pvpanic support both 'panicked' and 'crashloaded' events.
+This is to add extra 'reboot' and 'shutdown' events.
+
+{"timestamp": {"seconds": 1625377376, "microseconds": 801110}, "event": "GUEST_REBOOT", "data": {"action": "run"}}
+
+{"timestamp": {"seconds": 1625377412, "microseconds": 698836}, "event": "GUEST_SHUTDOWN", "data": {"action": "run"}}
+
+Signed-off-by: Dongli Zhang <dongli.zhang@oracle.com>
+---
+ hw/misc/pvpanic-isa.c     |  3 ++-
+ hw/misc/pvpanic-pci.c     |  3 ++-
+ hw/misc/pvpanic.c         | 10 ++++++++++
+ include/hw/misc/pvpanic.h |  7 +++++++
+ include/sysemu/runstate.h |  2 ++
+ qapi/run-state.json       | 40 +++++++++++++++++++++++++++++++++++++++
+ softmmu/runstate.c        | 22 +++++++++++++++++++++
+ 7 files changed, 85 insertions(+), 2 deletions(-)
+
+diff --git a/hw/misc/pvpanic-isa.c b/hw/misc/pvpanic-isa.c
+index 7b66d58acc..b4491eb138 100644
+--- a/hw/misc/pvpanic-isa.c
++++ b/hw/misc/pvpanic-isa.c
+@@ -64,7 +64,8 @@ static void pvpanic_isa_realizefn(DeviceState *dev, Error **errp)
+ 
+ static Property pvpanic_isa_properties[] = {
+     DEFINE_PROP_UINT16(PVPANIC_IOPORT_PROP, PVPanicISAState, ioport, 0x505),
+-    DEFINE_PROP_UINT8("events", PVPanicISAState, pvpanic.events, PVPANIC_PANICKED | PVPANIC_CRASHLOADED),
++    DEFINE_PROP_UINT8("events", PVPanicISAState, pvpanic.events,
++                      PVPANIC_DEFAULT),
+     DEFINE_PROP_END_OF_LIST(),
+ };
+ 
+diff --git a/hw/misc/pvpanic-pci.c b/hw/misc/pvpanic-pci.c
+index af8cbe2830..f69c7a81db 100644
+--- a/hw/misc/pvpanic-pci.c
++++ b/hw/misc/pvpanic-pci.c
+@@ -53,7 +53,8 @@ static void pvpanic_pci_realizefn(PCIDevice *dev, Error **errp)
+ }
+ 
+ static Property pvpanic_pci_properties[] = {
+-    DEFINE_PROP_UINT8("events", PVPanicPCIState, pvpanic.events, PVPANIC_PANICKED | PVPANIC_CRASHLOADED),
++    DEFINE_PROP_UINT8("events", PVPanicPCIState, pvpanic.events,
++                      PVPANIC_DEFAULT),
+     DEFINE_PROP_END_OF_LIST(),
+ };
+ 
+diff --git a/hw/misc/pvpanic.c b/hw/misc/pvpanic.c
+index e2cb4a5d28..60782f2a22 100644
+--- a/hw/misc/pvpanic.c
++++ b/hw/misc/pvpanic.c
+@@ -40,6 +40,16 @@ static void handle_event(int event)
+         qemu_system_guest_crashloaded(NULL);
+         return;
+     }
++
++    if (event & PVPANIC_REBOOT) {
++        qemu_system_guest_reboot(NULL);
++        return;
++    }
++
++    if (event & PVPANIC_SHUTDOWN) {
++        qemu_system_guest_shutdown(NULL);
++        return;
++    }
+ }
+ 
+ /* return supported events on read */
+diff --git a/include/hw/misc/pvpanic.h b/include/hw/misc/pvpanic.h
+index ca3c5bb533..aeae047669 100644
+--- a/include/hw/misc/pvpanic.h
++++ b/include/hw/misc/pvpanic.h
+@@ -25,10 +25,17 @@
+ /* The bit of supported pv event, TODO: include uapi header and remove this */
+ #define PVPANIC_F_PANICKED      0
+ #define PVPANIC_F_CRASHLOADED   1
++#define PVPANIC_F_REBOOT        2
++#define PVPANIC_F_SHUTDOWN      3
+ 
+ /* The pv event value */
+ #define PVPANIC_PANICKED        (1 << PVPANIC_F_PANICKED)
+ #define PVPANIC_CRASHLOADED     (1 << PVPANIC_F_CRASHLOADED)
++#define PVPANIC_REBOOT          (1 << PVPANIC_F_REBOOT)
++#define PVPANIC_SHUTDOWN        (1 << PVPANIC_F_SHUTDOWN)
++
++#define PVPANIC_DEFAULT         (PVPANIC_PANICKED | PVPANIC_CRASHLOADED | \
++                                 PVPANIC_REBOOT | PVPANIC_SHUTDOWN)
+ 
+ /*
+  * PVPanicState for any device type
+diff --git a/include/sysemu/runstate.h b/include/sysemu/runstate.h
+index a535691573..a20093db27 100644
+--- a/include/sysemu/runstate.h
++++ b/include/sysemu/runstate.h
+@@ -69,6 +69,8 @@ void qemu_system_killed(int signal, pid_t pid);
+ void qemu_system_reset(ShutdownCause reason);
+ void qemu_system_guest_panicked(GuestPanicInformation *info);
+ void qemu_system_guest_crashloaded(GuestPanicInformation *info);
++void qemu_system_guest_reboot(GuestPanicInformation *info);
++void qemu_system_guest_shutdown(GuestPanicInformation *info);
+ 
+ #endif
+ 
+diff --git a/qapi/run-state.json b/qapi/run-state.json
+index 43d66d700f..7585963859 100644
+--- a/qapi/run-state.json
++++ b/qapi/run-state.json
+@@ -450,6 +450,46 @@
+ { 'event': 'GUEST_CRASHLOADED',
+   'data': { 'action': 'GuestPanicAction', '*info': 'GuestPanicInformation' } }
+ 
++##
++# @GUEST_REBOOT:
++#
++# Emitted when guest OS reboot is detected
++#
++# @action: action that has been taken, currently always "run"
++#
++# @info: information about a reboot
++#
++# Since: 6.1
++#
++# Example:
++#
++# <- { "event": "GUEST_REBOOT",
++#      "data": { "action": "run" } }
++#
++##
++{ 'event': 'GUEST_REBOOT',
++  'data': { 'action': 'GuestPanicAction', '*info': 'GuestPanicInformation' } }
++
++##
++# @GUEST_SHUTDOWN:
++#
++# Emitted when guest OS shutdown is detected
++#
++# @action: action that has been taken, currently always "run"
++#
++# @info: information about a shutdown
++#
++# Since: 6.1
++#
++# Example:
++#
++# <- { "event": "GUEST_SHUTDOWN",
++#      "data": { "action": "run" } }
++#
++##
++{ 'event': 'GUEST_SHUTDOWN',
++  'data': { 'action': 'GuestPanicAction', '*info': 'GuestPanicInformation' } }
++
+ ##
+ # @GuestPanicAction:
+ #
+diff --git a/softmmu/runstate.c b/softmmu/runstate.c
+index 10d9b7365a..addec1b904 100644
+--- a/softmmu/runstate.c
++++ b/softmmu/runstate.c
+@@ -524,6 +524,28 @@ void qemu_system_guest_crashloaded(GuestPanicInformation *info)
+     }
+ }
+ 
++void qemu_system_guest_reboot(GuestPanicInformation *info)
++{
++    qemu_log_mask(LOG_GUEST_ERROR, "Guest reboot");
++
++    qapi_event_send_guest_reboot(GUEST_PANIC_ACTION_RUN, !!info, info);
++
++    if (info) {
++        qapi_free_GuestPanicInformation(info);
++    }
++}
++
++void qemu_system_guest_shutdown(GuestPanicInformation *info)
++{
++    qemu_log_mask(LOG_GUEST_ERROR, "Guest shutdown");
++
++    qapi_event_send_guest_shutdown(GUEST_PANIC_ACTION_RUN, !!info, info);
++
++    if (info) {
++        qapi_free_GuestPanicInformation(info);
++    }
++}
++
+ void qemu_system_reset_request(ShutdownCause reason)
+ {
+     if (reboot_action == REBOOT_ACTION_SHUTDOWN &&
+-- 
+2.17.1
+
