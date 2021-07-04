@@ -1,6 +1,6 @@
-From ec93a31d70040c7b2c8e53b0111d132da9c99f1e Mon Sep 17 00:00:00 2001
+From 2fc96c05766545b7ce2d1da0bc6e188828dc1ff4 Mon Sep 17 00:00:00 2001
 From: Dongli Zhang <dongli.zhang@oracle.com>
-Date: Sat, 3 Jul 2021 20:08:59 -0700
+Date: Sun, 4 Jul 2021 01:07:45 -0700
 Subject: [PATCH qemu 1/1] pvpanic: add reboot and shutdown events
 
 This is based on qemu commit 1ec2cd0ce2ca ("Merge remote-tracking branch
@@ -15,15 +15,35 @@ This is to add extra 'reboot' and 'shutdown' events.
 
 Signed-off-by: Dongli Zhang <dongli.zhang@oracle.com>
 ---
- hw/misc/pvpanic-isa.c     |  3 ++-
- hw/misc/pvpanic-pci.c     |  3 ++-
- hw/misc/pvpanic.c         | 10 ++++++++++
- include/hw/misc/pvpanic.h |  7 +++++++
- include/sysemu/runstate.h |  2 ++
- qapi/run-state.json       | 40 +++++++++++++++++++++++++++++++++++++++
- softmmu/runstate.c        | 22 +++++++++++++++++++++
- 7 files changed, 85 insertions(+), 2 deletions(-)
+ docs/specs/pvpanic.txt         |  6 +++++
+ hw/misc/pvpanic-isa.c          |  3 ++-
+ hw/misc/pvpanic-pci.c          |  3 ++-
+ hw/misc/pvpanic.c              | 10 +++++++++
+ include/hw/misc/pvpanic.h      |  7 ++++++
+ include/sysemu/runstate.h      |  2 ++
+ qapi/run-state.json            | 40 ++++++++++++++++++++++++++++++++++
+ softmmu/runstate.c             | 22 +++++++++++++++++++
+ tests/qtest/pvpanic-pci-test.c |  4 ++--
+ tests/qtest/pvpanic-test.c     |  4 ++--
+ 10 files changed, 95 insertions(+), 6 deletions(-)
 
+diff --git a/docs/specs/pvpanic.txt b/docs/specs/pvpanic.txt
+index 8afcde11cc..fb196271b5 100644
+--- a/docs/specs/pvpanic.txt
++++ b/docs/specs/pvpanic.txt
+@@ -26,6 +26,12 @@ bit 0: a guest panic has happened and should be processed by the host
+ bit 1: a guest panic has happened and will be handled by the guest;
+        the host should record it or report it, but should not affect
+        the execution of the guest.
++bit 2: a guest reboot has happened and will be handled by the guest;
++       the host should record it or report it, but should not affect
++       the execution of the guest.
++bit 3: a guest shutdown has happened and will be handled by the guest;
++       the host should record it or report it, but should not affect
++       the execution of the guest.
+ 
+ PCI Interface
+ -------------
 diff --git a/hw/misc/pvpanic-isa.c b/hw/misc/pvpanic-isa.c
 index 7b66d58acc..b4491eb138 100644
 --- a/hw/misc/pvpanic-isa.c
@@ -192,6 +212,50 @@ index 10d9b7365a..addec1b904 100644
  void qemu_system_reset_request(ShutdownCause reason)
  {
      if (reboot_action == REBOOT_ACTION_SHUTDOWN &&
+diff --git a/tests/qtest/pvpanic-pci-test.c b/tests/qtest/pvpanic-pci-test.c
+index 2358852d35..00a82954c2 100644
+--- a/tests/qtest/pvpanic-pci-test.c
++++ b/tests/qtest/pvpanic-pci-test.c
+@@ -34,7 +34,7 @@ static void test_panic_nopause(void)
+     bar = qpci_iomap(dev, 0, NULL);
+ 
+     qpci_memread(dev, bar, 0, &val, sizeof(val));
+-    g_assert_cmpuint(val, ==, 3);
++    g_assert_cmpuint(val, ==, 15);
+ 
+     val = 1;
+     qpci_memwrite(dev, bar, 0, &val, sizeof(val));
+@@ -67,7 +67,7 @@ static void test_panic(void)
+     bar = qpci_iomap(dev, 0, NULL);
+ 
+     qpci_memread(dev, bar, 0, &val, sizeof(val));
+-    g_assert_cmpuint(val, ==, 3);
++    g_assert_cmpuint(val, ==, 15);
+ 
+     val = 1;
+     qpci_memwrite(dev, bar, 0, &val, sizeof(val));
+diff --git a/tests/qtest/pvpanic-test.c b/tests/qtest/pvpanic-test.c
+index 6dcad2db49..4cf61fdc81 100644
+--- a/tests/qtest/pvpanic-test.c
++++ b/tests/qtest/pvpanic-test.c
+@@ -20,7 +20,7 @@ static void test_panic_nopause(void)
+     qts = qtest_init("-device pvpanic -action panic=none");
+ 
+     val = qtest_inb(qts, 0x505);
+-    g_assert_cmpuint(val, ==, 3);
++    g_assert_cmpuint(val, ==, 15);
+ 
+     qtest_outb(qts, 0x505, 0x1);
+ 
+@@ -43,7 +43,7 @@ static void test_panic(void)
+     qts = qtest_init("-device pvpanic -action panic=pause");
+ 
+     val = qtest_inb(qts, 0x505);
+-    g_assert_cmpuint(val, ==, 3);
++    g_assert_cmpuint(val, ==, 15);
+ 
+     qtest_outb(qts, 0x505, 0x1);
+ 
 -- 
 2.17.1
 
