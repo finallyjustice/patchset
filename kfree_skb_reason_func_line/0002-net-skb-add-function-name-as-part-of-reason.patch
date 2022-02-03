@@ -1,0 +1,179 @@
+From d78a64e8a3617ead0193aa0ae4d4c318558d29f3 Mon Sep 17 00:00:00 2001
+From: Dongli Zhang <dongli.zhang@oracle.com>
+Date: Wed, 2 Feb 2022 09:16:34 -0800
+Subject: [PATCH RFC 2/4] net: skb: add function name as part of reason
+
+In addition to the line number ("__LINE__"), this is to make the
+function name ("__func__", which is the caller of kfree_skb_reason())
+as part of reason.
+
+The (function, line) combination is able to uniquely represent where the
+sk_buff is dropped.
+
+The existing trace_kfree_skb() is able to trace the 'location'. While it
+is fine to either echo 'stacktrace' to the trigger, or trace at
+userspace via ebpf, the TP_printk will only print %p.
+
+With the function name, the TP_printk will tell the function and the
+line number that the sk_buff is dropped.
+
+Cc: Joao Martins <joao.m.martins@oracle.com>
+Cc: Joe Jin <joe.jin@oracle.com>
+Signed-off-by: Dongli Zhang <dongli.zhang@oracle.com>
+---
+ include/linux/skbuff.h     |  7 +++++--
+ include/trace/events/skb.h | 10 ++++++----
+ net/core/dev.c             |  1 +
+ net/core/skbuff.c          |  9 ++++++---
+ net/ipv4/tcp_ipv4.c        |  2 +-
+ net/ipv4/udp.c             |  4 ++--
+ 6 files changed, 21 insertions(+), 12 deletions(-)
+
+diff --git a/include/linux/skbuff.h b/include/linux/skbuff.h
+index 471268a4a497..10bcbe4f690f 100644
+--- a/include/linux/skbuff.h
++++ b/include/linux/skbuff.h
+@@ -309,6 +309,8 @@ struct sk_buff;
+ 
+ #define SKB_DROP_LINE_NONE	0
+ #define SKB_DROP_LINE		__LINE__
++#define SKB_DROP_FUNC_NONE	"none"
++#define SKB_DROP_FUNC		__func__
+ 
+ /* To allow 64K frame to be packed as single skb without frag_list we
+  * require 64K/PAGE_SIZE pages plus 1 additional page to allow for
+@@ -1090,7 +1092,8 @@ static inline bool skb_unref(struct sk_buff *skb)
+ 	return true;
+ }
+ 
+-void kfree_skb_reason(struct sk_buff *skb, unsigned int line);
++void kfree_skb_reason(struct sk_buff *skb, const char *func,
++		      unsigned int line);
+ 
+ /**
+  *	kfree_skb - free an sk_buff with 'NOT_SPECIFIED' reason
+@@ -1098,7 +1101,7 @@ void kfree_skb_reason(struct sk_buff *skb, unsigned int line);
+  */
+ static inline void kfree_skb(struct sk_buff *skb)
+ {
+-	kfree_skb_reason(skb, SKB_DROP_LINE_NONE);
++	kfree_skb_reason(skb, SKB_DROP_FUNC_NONE, SKB_DROP_LINE_NONE);
+ }
+ 
+ void skb_release_head_state(struct sk_buff *skb);
+diff --git a/include/trace/events/skb.h b/include/trace/events/skb.h
+index 45d1a1757ff1..b63bf724809e 100644
+--- a/include/trace/events/skb.h
++++ b/include/trace/events/skb.h
+@@ -15,14 +15,15 @@
+ TRACE_EVENT(kfree_skb,
+ 
+ 	TP_PROTO(struct sk_buff *skb, void *location,
+-		 unsigned int line),
++		 const char *function, unsigned int line),
+ 
+-	TP_ARGS(skb, location, line),
++	TP_ARGS(skb, location, function, line),
+ 
+ 	TP_STRUCT__entry(
+ 		__field(void *,		skbaddr)
+ 		__field(void *,		location)
+ 		__field(unsigned short,	protocol)
++		__string(function, function)
+ 		__field(unsigned int,	line)
+ 	),
+ 
+@@ -30,12 +31,13 @@ TRACE_EVENT(kfree_skb,
+ 		__entry->skbaddr = skb;
+ 		__entry->location = location;
+ 		__entry->protocol = ntohs(skb->protocol);
++		__assign_str(function, function);
+ 		__entry->line = line;
+ 	),
+ 
+-	TP_printk("skbaddr=%p protocol=%u location=%p line: %u",
++	TP_printk("skbaddr=%p protocol=%u location=%p function=%s line=%u",
+ 		  __entry->skbaddr, __entry->protocol, __entry->location,
+-		  __entry->line)
++		  __get_str(function), __entry->line)
+ );
+ 
+ TRACE_EVENT(consume_skb,
+diff --git a/net/core/dev.c b/net/core/dev.c
+index 448f390d35d3..3dccd3248de9 100644
+--- a/net/core/dev.c
++++ b/net/core/dev.c
+@@ -4900,6 +4900,7 @@ static __latent_entropy void net_tx_action(struct softirq_action *h)
+ 				trace_consume_skb(skb);
+ 			else
+ 				trace_kfree_skb(skb, net_tx_action,
++						SKB_DROP_FUNC,
+ 						SKB_DROP_LINE);
+ 
+ 			if (skb->fclone != SKB_FCLONE_UNAVAILABLE)
+diff --git a/net/core/skbuff.c b/net/core/skbuff.c
+index 8572c3bce264..f7bceb310912 100644
+--- a/net/core/skbuff.c
++++ b/net/core/skbuff.c
+@@ -761,17 +761,20 @@ EXPORT_SYMBOL(__kfree_skb);
+ /**
+  *	kfree_skb_reason - free an sk_buff with special reason
+  *	@skb: buffer to free
++ *	@func: the function where this skb is dropped
+  *	@line: the line where this skb is dropped
+  *
+  *	Drop a reference to the buffer and free it if the usage count has
+- *	hit zero. Meanwhile, pass the drop line to 'kfree_skb' tracepoint.
++ *	hit zero. Meanwhile, pass the drop function and line to 'kfree_skb'
++ *	tracepoint.
+  */
+-void kfree_skb_reason(struct sk_buff *skb, unsigned int line)
++void kfree_skb_reason(struct sk_buff *skb, const char *func,
++		      unsigned int line)
+ {
+ 	if (!skb_unref(skb))
+ 		return;
+ 
+-	trace_kfree_skb(skb, __builtin_return_address(0), line);
++	trace_kfree_skb(skb, __builtin_return_address(0), func, line);
+ 	__kfree_skb(skb);
+ }
+ EXPORT_SYMBOL(kfree_skb_reason);
+diff --git a/net/ipv4/tcp_ipv4.c b/net/ipv4/tcp_ipv4.c
+index f23af94d1186..a1cb1252370b 100644
+--- a/net/ipv4/tcp_ipv4.c
++++ b/net/ipv4/tcp_ipv4.c
+@@ -2149,7 +2149,7 @@ int tcp_v4_rcv(struct sk_buff *skb)
+ 
+ discard_it:
+ 	/* Discard frame. */
+-	kfree_skb_reason(skb, drop_line);
++	kfree_skb_reason(skb, SKB_DROP_FUNC, drop_line);
+ 	return 0;
+ 
+ discard_and_relse:
+diff --git a/net/ipv4/udp.c b/net/ipv4/udp.c
+index f0715d1072d7..ae86ab56a7dd 100644
+--- a/net/ipv4/udp.c
++++ b/net/ipv4/udp.c
+@@ -2477,7 +2477,7 @@ int __udp4_lib_rcv(struct sk_buff *skb, struct udp_table *udptable,
+ 	 * Hmm.  We got an UDP packet to a port to which we
+ 	 * don't wanna listen.  Ignore it.
+ 	 */
+-	kfree_skb_reason(skb, drop_line);
++	kfree_skb_reason(skb, SKB_DROP_FUNC, drop_line);
+ 	return 0;
+ 
+ short_packet:
+@@ -2502,7 +2502,7 @@ int __udp4_lib_rcv(struct sk_buff *skb, struct udp_table *udptable,
+ 	__UDP_INC_STATS(net, UDP_MIB_CSUMERRORS, proto == IPPROTO_UDPLITE);
+ drop:
+ 	__UDP_INC_STATS(net, UDP_MIB_INERRORS, proto == IPPROTO_UDPLITE);
+-	kfree_skb_reason(skb, drop_line);
++	kfree_skb_reason(skb, SKB_DROP_FUNC, drop_line);
+ 	return 0;
+ }
+ 
+-- 
+2.17.1
+

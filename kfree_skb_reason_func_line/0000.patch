@@ -1,0 +1,82 @@
+[PATCH RFC 0/4] net: skb: to use (function, line) pair as reason for kfree_skb_reason()
+
+This RFC is to seek for suggestion to track the reason that the sk_buff is
+dropped.
+
+Sometimes the kernel may not directly call kfree_skb() to drop the sk_buff.
+Instead, it "goto drop" and call kfree_skb() at 'drop'. This makes it
+difficult to track the reason that the sk_buff is dropped.
+
+The commit c504e5c2f964 ("net: skb: introduce kfree_skb_reason()") has
+introduced the kfree_skb_reason() to help track the reason. However, we may
+need to define many reasons for each driver/subsystem.
+
+I am going to trace the "goto drop" in TUN and TAP drivers. However, I will
+need to introduce many new reasons if I re-use kfree_skb_reason().
+
+
+There are some other options.
+
+1. The 1st option is to introduce a new tracepoint, e.g., trace_drop_skb()
+as below to track the function and line number. We would call
+trace_drop_skb() before "goto drop".
+
+TP_PROTO(struct sk_buff *skb, struct net_device *dev,
+         const char *function, unsigned int line),
+
+
+2. The 2nd option is to directly call trace_kfree_skb() before "goto drop".
+And we may replace kfree_skb() with below kfree_skb_notrace() as suggested
+by Joao Martins.
+
+/**
+ * kfree_skb_notrace - free an sk_buff without tracing
+ * @skb: buffer to free
+ *
+ * Drop a reference to the buffer and free it if the usage count has
+ * hit zero.
+ */
+void kfree_skb_notrace(struct sk_buff *skb)
+{
+    if (!skb_unref(skb))
+        return;
+
+    __kfree_skb(skb);
+}
+
+
+3. The last option is this RFC. To avoid introducing so many new reasons,
+we use (__func__, __LINE__) to uniquely identify the location of
+each "goto drop". The 'reason' introduced by the
+commit c504e5c2f964 ("net: skb: introduce kfree_skb_reason()") is replaced
+by the (function, line) pair.
+
+The below is the sample output from trace_pipe by this RFC, when the
+sk_buff is dropped by TUN driver.
+
+
+          <idle>-0       [016] ..s1.   432.701987: kfree_skb: skbaddr=00000000a65c0a72 protocol=0 location=000000008a49d80c function=none line=0
+          <idle>-0       [003] b.s2.   432.704397: kfree_skb: skbaddr=00000000665e5ccd protocol=2048 location=00000000ec3b7129 function=tun_net_xmit line=1116
+          <idle>-0       [003] ..s1.   432.704400: kfree_skb: skbaddr=00000000e4c806f8 protocol=2048 location=000000002929642d function=none line=0
+          <idle>-0       [002] b.s2.   432.734617: kfree_skb: skbaddr=00000000079749b3 protocol=2048 location=00000000ec3b7129 function=tun_net_xmit line=1116
+          <idle>-0       [015] b.s2.   432.880571: kfree_skb: skbaddr=00000000e1542f1e protocol=34525 location=00000000ec3b7129 function=tun_net_xmit line=1116
+          <idle>-0       [015] ..s1.   432.880577: kfree_skb: skbaddr=000000004f3022b6 protocol=34525 location=00000000547c5c25 function=none line=0
+          <idle>-0       [002] b.s2.   432.886247: kfree_skb: skbaddr=0000000062990a71 protocol=2054 location=00000000ec3b7129 function=tun_net_xmit line=1116
+
+
+ drivers/net/tap.c          | 30 ++++++++++++++++++++++--------
+ drivers/net/tun.c          | 33 +++++++++++++++++++++++++--------
+ include/linux/skbuff.h     | 24 +++++++-----------------
+ include/trace/events/skb.h | 37 ++++++++-----------------------------
+ net/core/dev.c             |  3 ++-
+ net/core/skbuff.c          | 10 ++++++----
+ net/ipv4/tcp_ipv4.c        | 14 +++++++-------
+ net/ipv4/udp.c             | 14 +++++++-------
+ 8 files changed, 84 insertions(+), 81 deletions(-)
+
+
+Would you please share your suggestion and feedback?
+
+Thank you very much!
+
+Dongli Zhang
