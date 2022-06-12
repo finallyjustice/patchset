@@ -1,0 +1,125 @@
+From ae4035ae0a012843b7ec90c749fc002368f3b562 Mon Sep 17 00:00:00 2001
+From: Dongli Zhang <dongli.zhang@oracle.com>
+Date: Mon, 12 Jul 2021 14:50:36 -0700
+Subject: [PATCH v4 3/3] virtio-pci/hmp: implement device specific hmp interface
+
+This patch is to implement the device specific interface to dump the
+mapping between virtio queues and vectors.
+
+(qemu) info msix -d /machine/peripheral/vscsi0
+Msg L.Addr Msg U.Addr Msg Data   Vect Ctrl
+0xfee00000 0x00000000 0x00004041 0x00000000
+0xfee00000 0x00000000 0x00004051 0x00000000
+0xfee00000 0x00000000 0x00004061 0x00000000
+0xfee00000 0x00000000 0x00004071 0x00000000
+0xfee01000 0x00000000 0x000040b1 0x00000000
+0xfee02000 0x00000000 0x000040c1 0x00000000
+0xfee03000 0x00000000 0x000040d1 0x00000000
+
+MSI-X PBA
+0 0 0 0 0 0 0
+
+virtio pci vector info:
+config: 0
+queue 0: 1
+queue 1: 2
+queue 2: 3
+queue 3: 4
+queue 4: 5
+queue 5: 6
+
+Cc: Jason Wang <jasowang@redhat.com>
+Cc: Joe Jin <joe.jin@oracle.com>
+Suggested-by: Jason Wang <jasowang@redhat.com>
+Signed-off-by: Dongli Zhang <dongli.zhang@oracle.com>
+Acked-by: Jason Wang <jasowang@redhat.com>
+---
+ hw/virtio/virtio-pci.c     | 22 ++++++++++++++++++++++
+ hw/virtio/virtio.c         | 10 ++++++++++
+ include/hw/virtio/virtio.h |  2 ++
+ 3 files changed, 34 insertions(+)
+
+diff --git a/hw/virtio/virtio-pci.c b/hw/virtio/virtio-pci.c
+index 433060ac02..2971e8049c 100644
+--- a/hw/virtio/virtio-pci.c
++++ b/hw/virtio/virtio-pci.c
+@@ -38,6 +38,7 @@
+ #include "hw/virtio/virtio-bus.h"
+ #include "qapi/visitor.h"
+ #include "sysemu/replay.h"
++#include "monitor/monitor.h"
+ 
+ #define VIRTIO_PCI_REGION_SIZE(dev)     VIRTIO_PCI_CONFIG_OFF(msix_present(dev))
+ 
+@@ -1587,6 +1588,26 @@ static void virtio_pci_modern_io_region_unmap(VirtIOPCIProxy *proxy,
+                                 &region->mr);
+ }
+ 
++static void virtio_pci_dc_msix_info(Monitor *mon, PCIDevice *dev,
++                                    Error **errp)
++{
++    DeviceState *qdev = DEVICE(dev);
++    VirtIOPCIProxy *proxy = to_virtio_pci_proxy_fast(qdev);
++    VirtIODevice *vdev = virtio_bus_get_device(&proxy->bus);
++    int num = virtio_get_num_queues(vdev);
++    int i;
++
++    monitor_printf(mon, "virtio pci vector info:\n");
++
++    monitor_printf(mon, "config: %d\n", virtio_get_config_vector(vdev));
++
++    for (i = 0; i < num; i++)
++        monitor_printf(mon, "queue %d: %u\n",
++                       i, virtio_get_vector(vdev, i));
++
++    monitor_printf(mon, "\n");
++}
++
+ static void virtio_pci_pre_plugged(DeviceState *d, Error **errp)
+ {
+     VirtIOPCIProxy *proxy = VIRTIO_PCI(d);
+@@ -2004,6 +2025,7 @@ static void virtio_pci_class_init(ObjectClass *klass, void *data)
+     k->vendor_id = PCI_VENDOR_ID_REDHAT_QUMRANET;
+     k->revision = VIRTIO_PCI_ABI_VERSION;
+     k->class_id = PCI_CLASS_OTHERS;
++    k->msix_info = virtio_pci_dc_msix_info;
+     device_class_set_parent_realize(dc, virtio_pci_dc_realize,
+                                     &vpciklass->parent_dc_realize);
+     dc->reset = virtio_pci_reset;
+diff --git a/hw/virtio/virtio.c b/hw/virtio/virtio.c
+index 874377f37a..ea54939e98 100644
+--- a/hw/virtio/virtio.c
++++ b/hw/virtio/virtio.c
+@@ -2581,6 +2581,16 @@ void virtio_notify_config(VirtIODevice *vdev)
+     virtio_notify_vector(vdev, vdev->config_vector);
+ }
+ 
++uint16_t virtio_get_vector(VirtIODevice *vdev, int n)
++{
++    return vdev->vq[n].vector;
++}
++
++uint16_t virtio_get_config_vector(VirtIODevice *vdev)
++{
++    return vdev->config_vector;
++}
++
+ static bool virtio_device_endian_needed(void *opaque)
+ {
+     VirtIODevice *vdev = opaque;
+diff --git a/include/hw/virtio/virtio.h b/include/hw/virtio/virtio.h
+index 8bab9cfb75..6746227f73 100644
+--- a/include/hw/virtio/virtio.h
++++ b/include/hw/virtio/virtio.h
+@@ -268,6 +268,8 @@ int virtio_set_status(VirtIODevice *vdev, uint8_t val);
+ void virtio_reset(void *opaque);
+ void virtio_update_irq(VirtIODevice *vdev);
+ int virtio_set_features(VirtIODevice *vdev, uint64_t val);
++uint16_t virtio_get_vector(VirtIODevice *vdev, int n);
++uint16_t virtio_get_config_vector(VirtIODevice *vdev);
+ 
+ /* Base devices.  */
+ typedef struct VirtIOBlkConf VirtIOBlkConf;
+-- 
+2.17.1
+

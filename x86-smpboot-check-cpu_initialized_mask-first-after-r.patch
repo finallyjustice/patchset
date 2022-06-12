@@ -1,0 +1,69 @@
+From 1e20affac53c23e29b3878a68491bbbaae4f1879 Mon Sep 17 00:00:00 2001
+From: Dongli Zhang <dongli.zhang@oracle.com>
+Date: Thu, 23 Dec 2021 08:14:32 -0800
+Subject: [PATCH 1/1] x86/smpboot: check cpu_initialized_mask first after
+ returning from schedule()
+
+To online a new CPU, the master CPU signals the secondary and waits for at
+most 10 seconds until cpu_initialized_mask is set by the secondary CPU.
+There is a case that the master CPU fails the online when it takes 10+
+seconds for schedule() to return (although the cpu_initialized_mask is
+already set by the secondary CPU).
+
+1. The master CPU signals the secondary CPU in do_boot_cpu().
+
+2. As the cpu_initialized_mask is still not set, the master CPU reschedules
+via schedule().
+
+3. Suppose it takes 10+ seconds until schedule() returns due to performance
+issue. The secondary CPU sets the cpu_initialized_mask during those 10+
+seconds.
+
+4. Once the schedule() at the master CPU returns, although the
+cpu_initialized_mask is set, the time_before(jiffies, timeout) fails. As a
+result, the master CPU regards this as failure.
+
+[   51.983296] smpboot: do_boot_cpu failed(-1) to wakeup CPU#4
+
+5. Since the secondary CPU is stuck at state CPU_UP_PREPARE, any further
+online operation will fail by cpu_check_up_prepare(), unless the below
+patch set is applied.
+
+https://lore.kernel.org/all/20211206152034.2150770-1-bigeasy@linutronix.de/
+
+This issue is resolved by always first checking whether the secondary CPU
+has set cpu_initialized_mask.
+
+Cc: Joe Jin <joe.jin@oracle.com>
+Signed-off-by: Dongli Zhang <dongli.zhang@oracle.com>
+---
+ arch/x86/kernel/smpboot.c | 6 +++++-
+ 1 file changed, 5 insertions(+), 1 deletion(-)
+
+diff --git a/arch/x86/kernel/smpboot.c b/arch/x86/kernel/smpboot.c
+index 617012f4619f..faad4fcf67eb 100644
+--- a/arch/x86/kernel/smpboot.c
++++ b/arch/x86/kernel/smpboot.c
+@@ -1145,7 +1145,7 @@ static int do_boot_cpu(int apicid, int cpu, struct task_struct *idle,
+ 		 */
+ 		boot_error = -1;
+ 		timeout = jiffies + 10*HZ;
+-		while (time_before(jiffies, timeout)) {
++		while (true) {
+ 			if (cpumask_test_cpu(cpu, cpu_initialized_mask)) {
+ 				/*
+ 				 * Tell AP to proceed with initialization
+@@ -1154,6 +1154,10 @@ static int do_boot_cpu(int apicid, int cpu, struct task_struct *idle,
+ 				boot_error = 0;
+ 				break;
+ 			}
++
++			if (time_after_eq(jiffies, timeout))
++				break;
++
+ 			schedule();
+ 		}
+ 	}
+-- 
+2.17.1
+

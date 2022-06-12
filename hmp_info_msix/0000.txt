@@ -1,0 +1,68 @@
+[PATCH v4 0/3] To add HMP interface to dump PCI MSI-X table/PBA
+
+
+This is v4 to rework commit message to explain why only HMP.
+
+Changed since RFC v1:
+  - Add heading to MSI-X table (suggested by David Alan Gilbert)
+  - Add device specific interface, e.g., to dump virtio-pci queue-to-vector
+    mapping (Suggested By Jason)
+
+Changed since v2:
+  - Add msix_present() to pci-stub.c to avoid build error
+
+Changed since v3:
+  - Rework commit message to explain why only HMP (suggested by Markus
+    Armbruster)
+
+
+
+This patch is to introduce the new HMP command to dump the MSI-X table/PBA.
+
+Here is the RFC v1:
+
+https://lists.gnu.org/archive/html/qemu-devel/2021-04/msg04673.html
+
+The idea was inspired by below discussion:
+
+https://lists.gnu.org/archive/html/qemu-devel/2021-03/msg09020.html
+
+
+(qemu) info msix -d /machine/peripheral/vscsi0
+Msg L.Addr Msg U.Addr Msg Data   Vect Ctrl
+0xfee00000 0x00000000 0x00004041 0x00000000
+0xfee00000 0x00000000 0x00004051 0x00000000
+0xfee00000 0x00000000 0x00004061 0x00000000
+0xfee00000 0x00000000 0x00004071 0x00000000
+0xfee01000 0x00000000 0x000040b1 0x00000000
+0xfee02000 0x00000000 0x000040c1 0x00000000
+0xfee03000 0x00000000 0x000040d1 0x00000000
+
+MSI-X PBA
+0 0 0 0 0 0 0
+
+virtio pci vector info:
+config: 0
+queue 0: 1
+queue 1: 2
+queue 2: 3
+queue 3: 4
+queue 4: 5
+queue 5: 6
+
+
+ hmp-commands-info.hx       | 14 +++++++++
+ hw/pci/msix.c              | 63 +++++++++++++++++++++++++++++++++++++++++
+ hw/pci/pci-stub.c          |  5 ++++
+ hw/virtio/virtio-pci.c     | 22 ++++++++++++++
+ hw/virtio/virtio.c         | 10 +++++++
+ include/hw/pci/msix.h      |  2 ++
+ include/hw/pci/pci.h       |  3 ++
+ include/hw/virtio/virtio.h |  2 ++
+ include/monitor/hmp.h      |  1 +
+ softmmu/qdev-monitor.c     | 36 +++++++++++++++++++++++
+ 10 files changed, 158 insertions(+)
+
+Thank you very much!
+
+Dongli Zhang

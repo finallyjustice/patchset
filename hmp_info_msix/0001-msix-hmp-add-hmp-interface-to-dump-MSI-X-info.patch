@@ -1,0 +1,229 @@
+From 8f08ae49b1d56d094bbad1c223ae9f41d8d2a830 Mon Sep 17 00:00:00 2001
+From: Dongli Zhang <dongli.zhang@oracle.com>
+Date: Tue, 13 Jul 2021 15:58:32 -0700
+Subject: [PATCH v4 1/3] msix/hmp: add hmp interface to dump MSI-X info
+
+This patch is to add the HMP interface to dump MSI-X table and PBA, in
+order to help diagnose the loss of IRQ issue in VM (e.g., if an MSI-X
+vector is erroneously masked permanently). Here is the example with
+vhost-scsi:
+
+(qemu) info msix /machine/peripheral/vscsi0
+Msg L.Addr Msg U.Addr Msg Data   Vect Ctrl
+0xfee00000 0x00000000 0x00004041 0x00000000
+0xfee00000 0x00000000 0x00004051 0x00000000
+0xfee00000 0x00000000 0x00004061 0x00000000
+0xfee00000 0x00000000 0x00004071 0x00000000
+0xfee01000 0x00000000 0x000040b1 0x00000000
+0xfee02000 0x00000000 0x000040c1 0x00000000
+0xfee03000 0x00000000 0x000040d1 0x00000000
+
+MSI-X PBA
+0 0 0 0 0 0 0
+
+Since this is just for debugging by humans, provide the command only in
+HMP, not in QMP.
+
+Cc: Jason Wang <jasowang@redhat.com>
+Cc: Joe Jin <joe.jin@oracle.com>
+Signed-off-by: Dongli Zhang <dongli.zhang@oracle.com>
+Acked-by: Dr. David Alan Gilbert <dgilbert@redhat.com>
+Acked-by: Jason Wang <jasowang@redhat.com>
+---
+Changed since v1/v2:
+  - Add msix_present() to pci-stub.c to avoid build error
+Changed since v3:
+  - Rework commit message to explain why only HMP (suggested by Markus
+    Armbruster)
+
+ hmp-commands-info.hx   | 13 +++++++++
+ hw/pci/msix.c          | 63 ++++++++++++++++++++++++++++++++++++++++++
+ hw/pci/pci-stub.c      |  5 ++++
+ include/hw/pci/msix.h  |  2 ++
+ include/monitor/hmp.h  |  1 +
+ softmmu/qdev-monitor.c | 25 +++++++++++++++++
+ 6 files changed, 109 insertions(+)
+
+diff --git a/hmp-commands-info.hx b/hmp-commands-info.hx
+index 27206ac049..ce5c550d44 100644
+--- a/hmp-commands-info.hx
++++ b/hmp-commands-info.hx
+@@ -221,6 +221,19 @@ SRST
+     Show PCI information.
+ ERST
+ 
++    {
++        .name       = "msix",
++        .args_type  = "dev:s",
++        .params     = "dev",
++        .help       = "dump MSI-X information",
++        .cmd        = hmp_info_msix,
++    },
++
++SRST
++  ``info msix`` *dev*
++    Dump MSI-X information for device *dev*.
++ERST
++
+ #if defined(TARGET_I386) || defined(TARGET_SH4) || defined(TARGET_SPARC) || \
+     defined(TARGET_PPC) || defined(TARGET_XTENSA) || defined(TARGET_M68K)
+     {
+diff --git a/hw/pci/msix.c b/hw/pci/msix.c
+index ae9331cd0b..4b4ec87eee 100644
+--- a/hw/pci/msix.c
++++ b/hw/pci/msix.c
+@@ -22,6 +22,7 @@
+ #include "sysemu/xen.h"
+ #include "migration/qemu-file-types.h"
+ #include "migration/vmstate.h"
++#include "monitor/monitor.h"
+ #include "qemu/range.h"
+ #include "qapi/error.h"
+ #include "trace.h"
+@@ -669,3 +670,65 @@ const VMStateDescription vmstate_msix = {
+         VMSTATE_END_OF_LIST()
+     }
+ };
++
++static void msix_dump_table(Monitor *mon, PCIDevice *dev)
++{
++    int vector;
++    uint32_t val;
++    uint8_t *table_entry;
++
++    monitor_printf(mon, "Msg L.Addr ");
++    monitor_printf(mon, "Msg U.Addr ");
++    monitor_printf(mon, "Msg Data   ");
++    monitor_printf(mon, "Vect Ctrl\n");
++
++    for (vector = 0; vector < dev->msix_entries_nr; vector++) {
++        table_entry = dev->msix_table + vector * PCI_MSIX_ENTRY_SIZE;
++
++        val = pci_get_long(table_entry + PCI_MSIX_ENTRY_LOWER_ADDR);
++        monitor_printf(mon, "0x%08x ", val);
++
++        val = pci_get_long(table_entry + PCI_MSIX_ENTRY_UPPER_ADDR);
++        monitor_printf(mon, "0x%08x ", val);
++
++        val = pci_get_long(table_entry + PCI_MSIX_ENTRY_DATA);
++        monitor_printf(mon, "0x%08x ", val);
++
++        val = pci_get_long(table_entry + PCI_MSIX_ENTRY_VECTOR_CTRL);
++        monitor_printf(mon, "0x%08x\n", val);
++    }
++
++    monitor_printf(mon, "\n");
++}
++
++static void msix_dump_pba(Monitor *mon, PCIDevice *dev)
++{
++    int vector;
++
++    monitor_printf(mon, "MSI-X PBA\n");
++
++    for (vector = 0; vector < dev->msix_entries_nr; vector++) {
++        monitor_printf(mon, "%d ", !!msix_is_pending(dev, vector));
++
++        if (vector % 16 == 15) {
++            monitor_printf(mon, "\n");
++        }
++    }
++
++    if (vector % 16 != 15) {
++        monitor_printf(mon, "\n");
++    }
++
++    monitor_printf(mon, "\n");
++}
++
++void msix_dump_info(Monitor *mon, PCIDevice *dev, Error **errp)
++{
++    if (!msix_present(dev)) {
++        error_setg(errp, "MSI-X not available");
++        return;
++    }
++
++    msix_dump_table(mon, dev);
++    msix_dump_pba(mon, dev);
++}
+diff --git a/hw/pci/pci-stub.c b/hw/pci/pci-stub.c
+index 3a027c42e4..8191d49d56 100644
+--- a/hw/pci/pci-stub.c
++++ b/hw/pci/pci-stub.c
+@@ -91,3 +91,8 @@ MSIMessage msix_get_message(PCIDevice *dev, unsigned int vector)
+ {
+     g_assert_not_reached();
+ }
++
++void msix_dump_info(Monitor *mon, PCIDevice *dev, Error **errp)
++{
++     monitor_printf(mon, "PCI devices not supported\n");
++}
+diff --git a/include/hw/pci/msix.h b/include/hw/pci/msix.h
+index 4c4a60c739..10a4500295 100644
+--- a/include/hw/pci/msix.h
++++ b/include/hw/pci/msix.h
+@@ -47,6 +47,8 @@ int msix_set_vector_notifiers(PCIDevice *dev,
+                               MSIVectorPollNotifier poll_notifier);
+ void msix_unset_vector_notifiers(PCIDevice *dev);
+ 
++void msix_dump_info(Monitor *mon, PCIDevice *dev, Error **errp);
++
+ extern const VMStateDescription vmstate_msix;
+ 
+ #define VMSTATE_MSIX_TEST(_field, _state, _test) {                   \
+diff --git a/include/monitor/hmp.h b/include/monitor/hmp.h
+index 3baa1058e2..97c040a3c8 100644
+--- a/include/monitor/hmp.h
++++ b/include/monitor/hmp.h
+@@ -36,6 +36,7 @@ void hmp_info_irq(Monitor *mon, const QDict *qdict);
+ void hmp_info_pic(Monitor *mon, const QDict *qdict);
+ void hmp_info_rdma(Monitor *mon, const QDict *qdict);
+ void hmp_info_pci(Monitor *mon, const QDict *qdict);
++void hmp_info_msix(Monitor *mon, const QDict *qdict);
+ void hmp_info_tpm(Monitor *mon, const QDict *qdict);
+ void hmp_info_iothreads(Monitor *mon, const QDict *qdict);
+ void hmp_quit(Monitor *mon, const QDict *qdict);
+diff --git a/softmmu/qdev-monitor.c b/softmmu/qdev-monitor.c
+index 721dec2d82..7837a17d0d 100644
+--- a/softmmu/qdev-monitor.c
++++ b/softmmu/qdev-monitor.c
+@@ -19,6 +19,7 @@
+ 
+ #include "qemu/osdep.h"
+ #include "hw/sysbus.h"
++#include "hw/pci/msix.h"
+ #include "monitor/hmp.h"
+ #include "monitor/monitor.h"
+ #include "monitor/qdev.h"
+@@ -1005,3 +1006,27 @@ bool qmp_command_available(const QmpCommand *cmd, Error **errp)
+     }
+     return true;
+ }
++
++void hmp_info_msix(Monitor *mon, const QDict *qdict)
++{
++    const char *name = qdict_get_str(qdict, "dev");
++    DeviceState *dev = find_device_state(name, NULL);
++    PCIDevice *pci_dev;
++    Error *err = NULL;
++
++    if (!dev) {
++        error_setg(&err, "Device %s not found", name);
++        goto exit;
++    }
++
++    if (!object_dynamic_cast(OBJECT(dev), TYPE_PCI_DEVICE)) {
++        error_setg(&err, "Not a PCI device");
++        goto exit;
++    }
++
++    pci_dev = PCI_DEVICE(dev);
++    msix_dump_info(mon, pci_dev, &err);
++
++exit:
++    hmp_handle_error(mon, err);
++}
+-- 
+2.17.1
+

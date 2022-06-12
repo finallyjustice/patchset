@@ -1,0 +1,96 @@
+From 36dc7187f95c988aa5bdd547adaa1e305c86ecd4 Mon Sep 17 00:00:00 2001
+From: Dongli Zhang <dongli.zhang@oracle.com>
+Date: Mon, 12 Jul 2021 14:36:44 -0700
+Subject: [PATCH v4 2/3] msix/hmp: add interface to dump device specific info
+
+While the previous patch is to dump the MSI-X table, sometimes we may
+need to dump device specific data, e.g., to help match the vector with
+the specific device queue.
+
+This patch is to add the PCI device specific interface to help dump
+those information. Any PCI device class may implement this
+PCIDeviceClass->msix_info interface.
+
+Cc: Jason Wang <jasowang@redhat.com>
+Cc: Joe Jin <joe.jin@oracle.com>
+Suggested-by: Jason Wang <jasowang@redhat.com>
+Signed-off-by: Dongli Zhang <dongli.zhang@oracle.com>
+Acked-by: Jason Wang <jasowang@redhat.com>
+---
+ hmp-commands-info.hx   |  7 ++++---
+ include/hw/pci/pci.h   |  3 +++
+ softmmu/qdev-monitor.c | 11 +++++++++++
+ 3 files changed, 18 insertions(+), 3 deletions(-)
+
+diff --git a/hmp-commands-info.hx b/hmp-commands-info.hx
+index ce5c550d44..4e831d7ae4 100644
+--- a/hmp-commands-info.hx
++++ b/hmp-commands-info.hx
+@@ -223,9 +223,10 @@ ERST
+ 
+     {
+         .name       = "msix",
+-        .args_type  = "dev:s",
+-        .params     = "dev",
+-        .help       = "dump MSI-X information",
++        .args_type  = "info:-d,dev:s",
++        .params     = "[-d] dev",
++        .help       = "dump MSI-X information; "
++                      "(-d: show device specific info)",
+         .cmd        = hmp_info_msix,
+     },
+ 
+diff --git a/include/hw/pci/pci.h b/include/hw/pci/pci.h
+index 6be4e0c460..4620b9e757 100644
+--- a/include/hw/pci/pci.h
++++ b/include/hw/pci/pci.h
+@@ -129,6 +129,8 @@ typedef void PCIMapIORegionFunc(PCIDevice *pci_dev, int region_num,
+                                 pcibus_t addr, pcibus_t size, int type);
+ typedef void PCIUnregisterFunc(PCIDevice *pci_dev);
+ 
++typedef void PCIMSIXInfoFunc(Monitor *mon, PCIDevice *dev, Error **errp);
++
+ typedef struct PCIIORegion {
+     pcibus_t addr; /* current PCI mapping address. -1 means not mapped */
+ #define PCI_BAR_UNMAPPED (~(pcibus_t)0)
+@@ -224,6 +226,7 @@ struct PCIDeviceClass {
+     PCIUnregisterFunc *exit;
+     PCIConfigReadFunc *config_read;
+     PCIConfigWriteFunc *config_write;
++    PCIMSIXInfoFunc *msix_info;
+ 
+     uint16_t vendor_id;
+     uint16_t device_id;
+diff --git a/softmmu/qdev-monitor.c b/softmmu/qdev-monitor.c
+index 7837a17d0d..7fd3fe0ada 100644
+--- a/softmmu/qdev-monitor.c
++++ b/softmmu/qdev-monitor.c
+@@ -1011,7 +1011,9 @@ void hmp_info_msix(Monitor *mon, const QDict *qdict)
+ {
+     const char *name = qdict_get_str(qdict, "dev");
+     DeviceState *dev = find_device_state(name, NULL);
++    bool info = qdict_get_try_bool(qdict, "info", false);
+     PCIDevice *pci_dev;
++    PCIDeviceClass *pc;
+     Error *err = NULL;
+ 
+     if (!dev) {
+@@ -1027,6 +1029,15 @@ void hmp_info_msix(Monitor *mon, const QDict *qdict)
+     pci_dev = PCI_DEVICE(dev);
+     msix_dump_info(mon, pci_dev, &err);
+ 
++    if (info) {
++        pc = PCI_DEVICE_GET_CLASS(pci_dev);
++        if (pc->msix_info) {
++            pc->msix_info(mon, pci_dev, &err);
++        } else {
++            error_setg(&err, "Device specific info not supported");
++        }
++    }
++
+ exit:
+     hmp_handle_error(mon, err);
+ }
+-- 
+2.17.1
+
