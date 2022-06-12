@@ -1,0 +1,82 @@
+[PATCH RFC v1 0/7] swiotlb: extra 64-bit buffer for dev->dma_io_tlb_mem
+
+Hello,
+
+I used to send out a patchset on 64-bit buffer and people thought it was
+the same as Restricted DMA. However, the 64-bit buffer is still not supported.
+
+https://lore.kernel.org/all/20210203233709.19819-1-dongli.zhang@oracle.com/
+
+This RFC is to introduce the extra swiotlb buffer with SWIOTLB_ANY flag,
+to support 64-bit swiotlb.
+
+The core ideas are:
+
+1. Create an extra io_tlb_mem with SWIOTLB_ANY flags.
+
+2. The dev->dma_io_tlb_mem is set to either default or the extra io_tlb_mem,
+   depending on dma mask.
+
+
+Would you please help suggest for below questions in the RFC?
+
+- Is it fine to create the extra io_tlb_mem?
+
+- Which one is better: to create a separate variable for the extra
+  io_tlb_mem, or make it an array of two io_tlb_mem?
+
+- Should I set dev->dma_io_tlb_mem in each driver (e.g., virtio driver as
+  in this patchset)based on the value of
+  min_not_zero(*dev->dma_mask, dev->bus_dma_limit), or at higher level
+  (e.g., post pci driver)?
+
+
+This patchset is to demonstrate that the idea works. Since this is just a
+RFC, I have only tested virtio-blk on qemu-7.0 by enforcing swiotlb. It is
+not tested on AMD SEV environment.
+
+qemu-system-x86_64 -cpu host -name debug-threads=on \
+-smp 8 -m 16G -machine q35,accel=kvm -vnc :5 -hda boot.img \
+-kernel mainline-linux/arch/x86_64/boot/bzImage \
+-append "root=/dev/sda1 init=/sbin/init text console=ttyS0 loglevel=7 swiotlb=327680,3145728,force" \
+-device virtio-blk-pci,id=vblk0,num-queues=8,drive=drive0,disable-legacy=on,iommu_platform=true \
+-drive file=test.raw,if=none,id=drive0,cache=none \
+-net nic -net user,hostfwd=tcp::5025-:22 -serial stdio
+
+
+The kernel command line "swiotlb=327680,3145728,force" is to allocate 6GB for
+the extra swiotlb.
+
+[    2.826676] PCI-DMA: Using software bounce buffering for IO (SWIOTLB)
+[    2.826693] software IO TLB: default mapped [mem 0x0000000037000000-0x000000005f000000] (640MB)
+[    2.826697] software IO TLB: high mapped [mem 0x00000002edc80000-0x000000046dc80000] (6144MB)
+
+The highmem swiotlb is being used by virtio-blk.
+
+# cat /sys/kernel/debug/swiotlb/swiotlb-hi/io_tlb_nslabs 
+3145728
+# cat /sys/kernel/debug/swiotlb/swiotlb-hi/io_tlb_used 
+8960
+
+
+Dongli Zhang (7):
+  swiotlb: introduce the highmem swiotlb buffer
+  swiotlb: change the signature of remap function
+  swiotlb-xen: support highmem for xen specific code
+  swiotlb: to implement io_tlb_high_mem
+  swiotlb: add interface to set dev->dma_io_tlb_mem
+  virtio: use io_tlb_high_mem if it is active
+  swiotlb: fix the slot_addr() overflow
+
+arch/powerpc/kernel/dma-swiotlb.c      |   8 +-
+arch/x86/include/asm/xen/swiotlb-xen.h |   2 +-
+arch/x86/kernel/pci-dma.c              |   5 +-
+drivers/virtio/virtio.c                |   8 ++
+drivers/xen/swiotlb-xen.c              |  16 +++-
+include/linux/swiotlb.h                |  14 ++-
+kernel/dma/swiotlb.c                   | 136 +++++++++++++++++++++-------
+7 files changed, 145 insertions(+), 44 deletions(-)
+
+Thank you very much for feedback and suggestion!
+
+Dongli Zhang

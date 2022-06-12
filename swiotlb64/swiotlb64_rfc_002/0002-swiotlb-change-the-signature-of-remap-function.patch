@@ -1,0 +1,106 @@
+From a40472ffb9d01c8b605c0a01b2795a77290e2d74 Mon Sep 17 00:00:00 2001
+From: Dongli Zhang <dongli.zhang@oracle.com>
+Date: Wed, 8 Jun 2022 01:16:12 -0700
+Subject: [PATCH RFC v1 2/7] swiotlb: change the signature of remap function
+
+Add new argument 'high' to remap function, so that it will be able to
+remap the swiotlb buffer based on whether the swiotlb is 32-bit or
+64-bit.
+
+Currently the only remap function is xen_swiotlb_fixup().
+
+Cc: Konrad Wilk <konrad.wilk@oracle.com>
+Cc: Joe Jin <joe.jin@oracle.com>
+Signed-off-by: Dongli Zhang <dongli.zhang@oracle.com>
+---
+ arch/x86/include/asm/xen/swiotlb-xen.h | 2 +-
+ drivers/xen/swiotlb-xen.c              | 2 +-
+ include/linux/swiotlb.h                | 4 ++--
+ kernel/dma/swiotlb.c                   | 8 ++++----
+ 4 files changed, 8 insertions(+), 8 deletions(-)
+
+diff --git a/arch/x86/include/asm/xen/swiotlb-xen.h b/arch/x86/include/asm/xen/swiotlb-xen.h
+index 77a2d19cc990..a54eae15605e 100644
+--- a/arch/x86/include/asm/xen/swiotlb-xen.h
++++ b/arch/x86/include/asm/xen/swiotlb-xen.h
+@@ -8,7 +8,7 @@ extern int pci_xen_swiotlb_init_late(void);
+ static inline int pci_xen_swiotlb_init_late(void) { return -ENXIO; }
+ #endif
+ 
+-int xen_swiotlb_fixup(void *buf, unsigned long nslabs);
++int xen_swiotlb_fixup(void *buf, unsigned long nslabs, bool high);
+ int xen_create_contiguous_region(phys_addr_t pstart, unsigned int order,
+ 				unsigned int address_bits,
+ 				dma_addr_t *dma_handle);
+diff --git a/drivers/xen/swiotlb-xen.c b/drivers/xen/swiotlb-xen.c
+index 67aa74d20162..339f46e21053 100644
+--- a/drivers/xen/swiotlb-xen.c
++++ b/drivers/xen/swiotlb-xen.c
+@@ -104,7 +104,7 @@ static int is_xen_swiotlb_buffer(struct device *dev, dma_addr_t dma_addr)
+ }
+ 
+ #ifdef CONFIG_X86
+-int xen_swiotlb_fixup(void *buf, unsigned long nslabs)
++int xen_swiotlb_fixup(void *buf, unsigned long nslabs, bool high)
+ {
+ 	int rc;
+ 	unsigned int order = get_order(IO_TLB_SEGSIZE << IO_TLB_SHIFT);
+diff --git a/include/linux/swiotlb.h b/include/linux/swiotlb.h
+index e67e605af2dd..e61c074c55eb 100644
+--- a/include/linux/swiotlb.h
++++ b/include/linux/swiotlb.h
+@@ -36,9 +36,9 @@ struct scatterlist;
+ 
+ unsigned long swiotlb_size_or_default(void);
+ void __init swiotlb_init_remap(bool addressing_limit, unsigned int flags,
+-	int (*remap)(void *tlb, unsigned long nslabs));
++	int (*remap)(void *tlb, unsigned long nslabs, bool high));
+ int swiotlb_init_late(size_t size, gfp_t gfp_mask,
+-	int (*remap)(void *tlb, unsigned long nslabs));
++	int (*remap)(void *tlb, unsigned long nslabs, bool high));
+ extern void __init swiotlb_update_mem_attributes(void);
+ 
+ phys_addr_t swiotlb_tbl_map_single(struct device *hwdev, phys_addr_t phys,
+diff --git a/kernel/dma/swiotlb.c b/kernel/dma/swiotlb.c
+index 569bc30e7b7a..7988883ca7f9 100644
+--- a/kernel/dma/swiotlb.c
++++ b/kernel/dma/swiotlb.c
+@@ -245,7 +245,7 @@ static void swiotlb_init_io_tlb_mem(struct io_tlb_mem *mem, phys_addr_t start,
+  * structures for the software IO TLB used to implement the DMA API.
+  */
+ void __init swiotlb_init_remap(bool addressing_limit, unsigned int flags,
+-		int (*remap)(void *tlb, unsigned long nslabs))
++		int (*remap)(void *tlb, unsigned long nslabs, bool high))
+ {
+ 	struct io_tlb_mem *mem = &io_tlb_default_mem;
+ 	unsigned long nslabs = default_nslabs;
+@@ -274,7 +274,7 @@ void __init swiotlb_init_remap(bool addressing_limit, unsigned int flags,
+ 		return;
+ 	}
+ 
+-	if (remap && remap(tlb, nslabs) < 0) {
++	if (remap && remap(tlb, nslabs, false) < 0) {
+ 		memblock_free(tlb, PAGE_ALIGN(bytes));
+ 
+ 		nslabs = ALIGN(nslabs >> 1, IO_TLB_SEGSIZE);
+@@ -307,7 +307,7 @@ void __init swiotlb_init(bool addressing_limit, unsigned int flags)
+  * This should be just like above, but with some error catching.
+  */
+ int swiotlb_init_late(size_t size, gfp_t gfp_mask,
+-		int (*remap)(void *tlb, unsigned long nslabs))
++		int (*remap)(void *tlb, unsigned long nslabs, bool high))
+ {
+ 	struct io_tlb_mem *mem = &io_tlb_default_mem;
+ 	unsigned long nslabs = ALIGN(size >> IO_TLB_SHIFT, IO_TLB_SEGSIZE);
+@@ -337,7 +337,7 @@ int swiotlb_init_late(size_t size, gfp_t gfp_mask,
+ 		return -ENOMEM;
+ 
+ 	if (remap)
+-		rc = remap(vstart, nslabs);
++		rc = remap(vstart, nslabs, false);
+ 	if (rc) {
+ 		free_pages((unsigned long)vstart, order);
+ 
+-- 
+2.17.1
+
