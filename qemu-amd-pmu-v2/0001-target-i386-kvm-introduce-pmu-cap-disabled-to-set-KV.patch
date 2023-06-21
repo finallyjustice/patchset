@@ -1,0 +1,173 @@
+From 6db8bf3d46ff2ef7874ba7940dd994d1ef9c4dc4 Mon Sep 17 00:00:00 2001
+From: Dongli Zhang <dongli.zhang@oracle.com>
+Date: Tue, 20 Jun 2023 14:20:01 -0700
+Subject: [PATCH RESEND v2 1/2] target/i386/kvm: introduce 'pmu-cap-disabled' to set
+ KVM_PMU_CAP_DISABLE
+
+The "perf stat" at the VM side still works even we set "-cpu host,-pmu" in
+the QEMU command line. That is, neither "-cpu host,-pmu" nor "-cpu EPYC"
+could disable the pmu virtualization in an AMD environment.
+
+We still see below at VM kernel side ...
+
+[    0.510611] Performance Events: Fam17h+ core perfctr, AMD PMU driver.
+
+... although we expect something like below.
+
+[    0.596381] Performance Events: PMU not available due to virtualization, using software events only.
+[    0.600972] NMI watchdog: Perf NMI watchdog permanently disabled
+
+This is because the AMD pmu (v1) does not rely on cpuid to decide if the
+pmu virtualization is supported.
+
+We introduce a new property 'pmu-cap-disabled' for KVM accel to set
+KVM_PMU_CAP_DISABLE if KVM_CAP_PMU_CAPABILITY is supported. Only x86 host
+is supported because currently KVM uses KVM_CAP_PMU_CAPABILITY only for
+x86.
+
+Cc: Joe Jin <joe.jin@oracle.com>
+Cc: Like Xu <likexu@tencent.com>
+Signed-off-by: Dongli Zhang <dongli.zhang@oracle.com>
+---
+Changed since v1:
+- In version 1 we did not introduce the new property. We ioctl
+  KVM_PMU_CAP_DISABLE only before the creation of the 1st vcpu. We had
+  introduced a helpfer function to do this job before creating the 1st
+  KVM vcpu in v1.
+
+ accel/kvm/kvm-all.c      |  1 +
+ include/sysemu/kvm_int.h |  1 +
+ qemu-options.hx          |  7 ++++++
+ target/i386/kvm/kvm.c    | 46 ++++++++++++++++++++++++++++++++++++++++
+ 4 files changed, 55 insertions(+)
+
+diff --git a/accel/kvm/kvm-all.c b/accel/kvm/kvm-all.c
+index 7679f397ae..238098e991 100644
+--- a/accel/kvm/kvm-all.c
++++ b/accel/kvm/kvm-all.c
+@@ -3763,6 +3763,7 @@ static void kvm_accel_instance_init(Object *obj)
+     s->xen_version = 0;
+     s->xen_gnttab_max_frames = 64;
+     s->xen_evtchn_max_pirq = 256;
++    s->pmu_cap_disabled = false;
+ }
+ 
+ /**
+diff --git a/include/sysemu/kvm_int.h b/include/sysemu/kvm_int.h
+index 511b42bde5..cbbe08ec54 100644
+--- a/include/sysemu/kvm_int.h
++++ b/include/sysemu/kvm_int.h
+@@ -123,6 +123,7 @@ struct KVMState
+     uint32_t xen_caps;
+     uint16_t xen_gnttab_max_frames;
+     uint16_t xen_evtchn_max_pirq;
++    bool pmu_cap_disabled;
+ };
+ 
+ void kvm_memory_listener_register(KVMState *s, KVMMemoryListener *kml,
+diff --git a/qemu-options.hx b/qemu-options.hx
+index b57489d7ca..1976c0ca3e 100644
+--- a/qemu-options.hx
++++ b/qemu-options.hx
+@@ -187,6 +187,7 @@ DEF("accel", HAS_ARG, QEMU_OPTION_accel,
+     "                tb-size=n (TCG translation block cache size)\n"
+     "                dirty-ring-size=n (KVM dirty ring GFN count, default 0)\n"
+     "                notify-vmexit=run|internal-error|disable,notify-window=n (enable notify VM exit and set notify window, x86 only)\n"
++    "                pmu-cap-disabled=true|false (disable KVM_CAP_PMU_CAPABILITY, x86 only, default false)\n"
+     "                thread=single|multi (enable multi-threaded TCG)\n", QEMU_ARCH_ALL)
+ SRST
+ ``-accel name[,prop=value[,...]]``
+@@ -254,6 +255,12 @@ SRST
+         open up for a specified of time (i.e. notify-window).
+         Default: notify-vmexit=run,notify-window=0.
+ 
++    ``pmu-cap-disabled=true|false``
++        When the KVM accelerator is used, it controls whether to disable the
++        KVM_CAP_PMU_CAPABILITY via KVM_PMU_CAP_DISABLE. When disabled, the
++        PMU virtualization is disabled at the KVM module side. This is for
++        x86 host only.
++
+ ERST
+ 
+ DEF("smp", HAS_ARG, QEMU_OPTION_smp,
+diff --git a/target/i386/kvm/kvm.c b/target/i386/kvm/kvm.c
+index de531842f6..bf4136fa1b 100644
+--- a/target/i386/kvm/kvm.c
++++ b/target/i386/kvm/kvm.c
+@@ -129,6 +129,7 @@ static bool has_msr_ucode_rev;
+ static bool has_msr_vmx_procbased_ctls2;
+ static bool has_msr_perf_capabs;
+ static bool has_msr_pkrs;
++static bool has_pmu_cap;
+ 
+ static uint32_t has_architectural_pmu_version;
+ static uint32_t num_architectural_pmu_gp_counters;
+@@ -2767,6 +2768,23 @@ int kvm_arch_init(MachineState *ms, KVMState *s)
+         }
+     }
+ 
++    has_pmu_cap = kvm_check_extension(s, KVM_CAP_PMU_CAPABILITY);
++
++    if (s->pmu_cap_disabled) {
++        if (has_pmu_cap) {
++            ret = kvm_vm_enable_cap(s, KVM_CAP_PMU_CAPABILITY, 0,
++                                    KVM_PMU_CAP_DISABLE);
++            if (ret < 0) {
++                s->pmu_cap_disabled = false;
++                error_report("kvm: Failed to disable pmu cap: %s",
++                             strerror(-ret));
++            }
++        } else {
++            s->pmu_cap_disabled = false;
++            error_report("kvm: KVM_CAP_PMU_CAPABILITY is not supported");
++        }
++    }
++
+     return 0;
+ }
+ 
+@@ -5951,6 +5969,28 @@ static void kvm_arch_set_xen_evtchn_max_pirq(Object *obj, Visitor *v,
+     s->xen_evtchn_max_pirq = value;
+ }
+ 
++static void kvm_set_pmu_cap_disabled(Object *obj, Visitor *v,
++                                     const char *name, void *opaque,
++                                     Error **errp)
++{
++    KVMState *s = KVM_STATE(obj);
++    bool pmu_cap_disabled;
++    Error *error = NULL;
++
++    if (s->fd != -1) {
++        error_setg(errp, "Cannot set properties after the accelerator has been initialized");
++        return;
++    }
++
++    visit_type_bool(v, name, &pmu_cap_disabled, &error);
++    if (error) {
++        error_propagate(errp, error);
++        return;
++    }
++
++    s->pmu_cap_disabled = pmu_cap_disabled;
++}
++
+ void kvm_arch_accel_class_init(ObjectClass *oc)
+ {
+     object_class_property_add_enum(oc, "notify-vmexit", "NotifyVMexitOption",
+@@ -5990,6 +6030,12 @@ void kvm_arch_accel_class_init(ObjectClass *oc)
+                               NULL, NULL);
+     object_class_property_set_description(oc, "xen-evtchn-max-pirq",
+                                           "Maximum number of Xen PIRQs");
++
++    object_class_property_add(oc, "pmu-cap-disabled", "bool",
++                              NULL, kvm_set_pmu_cap_disabled,
++                              NULL, NULL);
++    object_class_property_set_description(oc, "pmu-cap-disabled",
++                                          "Disable KVM_CAP_PMU_CAPABILITY");
+ }
+ 
+ void kvm_set_max_apic_id(uint32_t max_apic_id)
+-- 
+2.34.1
+
