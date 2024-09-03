@@ -59,6 +59,10 @@ Dongli Zhang (3):
  target/i386/kvm/kvm.c    | 234 ++++++++++++++++++++++++++++++++++++------
  5 files changed, 223 insertions(+), 29 deletions(-)
 
+So far we cannot add support to PERFMON_V2 unless the below patch is accepted.
+
+https://lore.kernel.org/all/69905b486218f8287b9703d1a9001175d04c2f02.1723068946.git.babu.moger@amd.com/
+
 Thank you very much!
 
 Dongli Zhang
