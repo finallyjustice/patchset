@@ -1,0 +1,68 @@
+[PATCH 0/5] target/i386/kvm: Fix two AMD PMU virtualization bugs
+
+This patchset addresses two bugs related to AMD PMU virtualization.
+
+1. The first issue is that using -cpu host,-pmu does not disable AMD PMU
+virtualization. When using "-cpu EPYC" or "-cpu host,-pmu", AMD PMU
+virtualization remains enabled. On the VM's Linux side, you might still
+see:
+
+[    0.510611] Performance Events: Fam17h+ core perfctr, AMD PMU driver.
+
+instead of:
+
+[    0.596381] Performance Events: PMU not available due to virtualization, using software events only.
+[    0.600972] NMI watchdog: Perf NMI watchdog permanently disabled
+
+To address this, we have introduced a new x86-specific accel/kvm property,
+"pmu-cap-disabled=true", which disables PMU virtualization via
+KVM_PMU_CAP_DISABLE.
+
+2. The second issue is that unreclaimed performance events (after a QEMU
+system_reset) in KVM may cause random, unwanted, or unknown NMIs to be
+injected into the VM.
+
+The AMD PMU registers are not reset during QEMU system_reset.
+
+1. If the VM is reset (e.g., via QEMU system_reset or VM kdump/kexec) while
+running "perf top", the PMU registers are not disabled properly.
+
+2. Despite x86_cpu_reset() resetting many registers to zero, kvm_put_msrs()
+does not handle AMD PMU registers, causing some PMU events to remain
+enabled in KVM.
+
+3. The KVM kvm_pmc_speculative_in_use() function consistently returns true,
+preventing the reclamation of these events. Consequently, the
+kvm_pmc->perf_event remains active.
+
+4. After a reboot, the VM kernel may report the following error:
+
+[    0.092011] Performance Events: Fam17h+ core perfctr, Broken BIOS detected, complain to your hardware vendor.
+[    0.092023] [Firmware Bug]: the BIOS has corrupted hw-PMU resources (MSR c0010200 is 530076)
+
+5. In the worst case, the active kvm_pmc->perf_event may inject unknown
+NMIs randomly into the VM kernel:
+
+[...] Uhhuh. NMI received for unknown reason 30 on CPU 0.
+
+To resolve these issues, we propose resetting AMD PMU registers during the
+VM reset process
+
+
+Dongli Zhang (5):
+  target/i386/kvm: init PMU information only once
+  target/i386/kvm: introduce 'pmu-cap-disabled' to set KVM_PMU_CAP_DISABLE
+  target/i386/kvm: rename architectural PMU variables
+  target/i386/kvm: reset AMD PMU registers during VM reset
+  target/i386/kvm: support perfmon-v2 for reset
+
+ accel/kvm/kvm-all.c      |   1 +
+ include/sysemu/kvm_int.h |   1 +
+ qemu-options.hx          |   9 +-
+ target/i386/cpu.h        |  12 ++
+ target/i386/kvm/kvm.c    | 328 +++++++++++++++++++++++++++++++++++++-----
+ 5 files changed, 311 insertions(+), 40 deletions(-)
+
+Thank you very much!
+
+Dongli Zhang
