@@ -1,0 +1,104 @@
+From 93d98a7efd06dd2551b9e3b40a90ee08d10f2348 Mon Sep 17 00:00:00 2001
+From: Dongli Zhang <dongli.zhang@oracle.com>
+Date: Fri, 7 Feb 2025 09:45:07 -0800
+Subject: [PATCH 1/1] virtio-scsi: test tmf queue
+
+v6.13.
+
+Signed-off-by: Dongli Zhang <dongli.zhang@oracle.com>
+---
+ drivers/scsi/virtio_scsi.c | 32 +++++++++++++++++++++++---------
+ 1 file changed, 23 insertions(+), 9 deletions(-)
+
+diff --git a/drivers/scsi/virtio_scsi.c b/drivers/scsi/virtio_scsi.c
+index 8471f38b7..a2c54aeeb 100644
+--- a/drivers/scsi/virtio_scsi.c
++++ b/drivers/scsi/virtio_scsi.c
+@@ -428,12 +428,14 @@ static void virtscsi_event_done(struct virtqueue *vq)
+ 
+ static int __virtscsi_add_cmd(struct virtqueue *vq,
+ 			    struct virtio_scsi_cmd *cmd,
+-			    size_t req_size, size_t resp_size)
++			    size_t req_size, size_t resp_size, bool is_tmf)
+ {
+ 	struct scsi_cmnd *sc = cmd->sc;
+ 	struct scatterlist *sgs[6], req, resp;
+ 	struct sg_table *out, *in;
+ 	unsigned out_num = 0, in_num = 0;
++	void *bad_buf;
++        struct scatterlist bad_sg[2];
+ 
+ 	out = in = NULL;
+ 
+@@ -456,9 +458,21 @@ static int __virtscsi_add_cmd(struct virtqueue *vq,
+ 		sgs[out_num++] = out->sgl;
+ 	}
+ 
+-	/* Response header.  */
+-	sg_init_one(&resp, &cmd->resp, resp_size);
+-	sgs[out_num + in_num++] = &resp;
++	if (is_tmf) {
++                memset(&bad_sg[0], 0, sizeof(struct scatterlist));
++                bad_buf = phys_to_virt(0x27fffffff);
++                sg_set_buf(&bad_sg[0], bad_buf, 1);
++
++                memset(&bad_sg[1], 0, sizeof(struct scatterlist));
++                sg_set_buf(&bad_sg[1], &cmd->resp, resp_size-1);
++                sg_mark_end(&bad_sg[1]);
++
++                sgs[out_num + in_num++] = bad_sg;
++        } else {
++		/* Response header.  */
++		sg_init_one(&resp, &cmd->resp, resp_size);
++		sgs[out_num + in_num++] = &resp;
++	}
+ 
+ 	/* Data-in buffer */
+ 	if (in) {
+@@ -495,14 +509,14 @@ static void virtscsi_kick_vq(struct virtio_scsi_vq *vq)
+ static int virtscsi_add_cmd(struct virtio_scsi_vq *vq,
+ 			     struct virtio_scsi_cmd *cmd,
+ 			     size_t req_size, size_t resp_size,
+-			     bool kick)
++			     bool kick, bool is_tmf)
+ {
+ 	unsigned long flags;
+ 	int err;
+ 	bool needs_kick = false;
+ 
+ 	spin_lock_irqsave(&vq->vq_lock, flags);
+-	err = __virtscsi_add_cmd(vq->vq, cmd, req_size, resp_size);
++	err = __virtscsi_add_cmd(vq->vq, cmd, req_size, resp_size, is_tmf);
+ 	if (!err && kick)
+ 		needs_kick = virtqueue_kick_prepare(vq->vq);
+ 
+@@ -599,7 +613,7 @@ static int virtscsi_queuecommand(struct Scsi_Host *shost,
+ 	}
+ 
+ 	kick = (sc->flags & SCMD_LAST) != 0;
+-	ret = virtscsi_add_cmd(req_vq, cmd, req_size, sizeof(cmd->resp.cmd), kick);
++	ret = virtscsi_add_cmd(req_vq, cmd, req_size, sizeof(cmd->resp.cmd), kick, false);
+ 	if (ret == -EIO) {
+ 		cmd->resp.cmd.response = VIRTIO_SCSI_S_BAD_TARGET;
+ 		spin_lock_irqsave(&req_vq->vq_lock, flags);
+@@ -618,7 +632,7 @@ static int virtscsi_tmf(struct virtio_scsi *vscsi, struct virtio_scsi_cmd *cmd)
+ 
+ 	cmd->comp = &comp;
+ 	if (virtscsi_add_cmd(&vscsi->ctrl_vq, cmd,
+-			      sizeof cmd->req.tmf, sizeof cmd->resp.tmf, true) < 0)
++			      sizeof cmd->req.tmf, sizeof cmd->resp.tmf, true, true) < 0)
+ 		goto out;
+ 
+ 	wait_for_completion(&comp);
+@@ -657,7 +671,7 @@ static int virtscsi_device_reset(struct scsi_cmnd *sc)
+ 		.type = VIRTIO_SCSI_T_TMF,
+ 		.subtype = cpu_to_virtio32(vscsi->vdev,
+ 					     VIRTIO_SCSI_T_TMF_LOGICAL_UNIT_RESET),
+-		.lun[0] = 1,
++		.lun[0] = 2,
+ 		.lun[1] = sc->device->id,
+ 		.lun[2] = (sc->device->lun >> 8) | 0x40,
+ 		.lun[3] = sc->device->lun & 0xff,
+-- 
+2.39.3
+

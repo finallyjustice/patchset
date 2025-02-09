@@ -1,0 +1,54 @@
+From 6411805dc9793f259a75db7b0c5e50a9b71a5546 Mon Sep 17 00:00:00 2001
+From: Dongli Zhang <dongli.zhang@oracle.com>
+Date: Wed, 29 Jan 2025 10:57:16 -0800
+Subject: [PATCH 7/9] vhost: add WARNING if log_num is more than limit
+
+Since long time ago, the only user of vq->log is vhost-net. The concern is
+to add support for more devices (i.e. vhost-scsi or vsock) may reveals
+unknown issue in the vhost API. Add a WARNING.
+
+Suggested-by: Joao Martins <joao.m.martins@oracle.com>
+Signed-off-by: Dongli Zhang <dongli.zhang@oracle.com>
+---
+ drivers/vhost/vhost.c | 18 ++++++++++++++++++
+ 1 file changed, 18 insertions(+)
+
+diff --git a/drivers/vhost/vhost.c b/drivers/vhost/vhost.c
+index db3b30aba940..8368370b40f7 100644
+--- a/drivers/vhost/vhost.c
++++ b/drivers/vhost/vhost.c
+@@ -2553,6 +2553,15 @@ static int get_indirect(struct vhost_virtqueue *vq,
+ 		if (access == VHOST_ACCESS_WO) {
+ 			*in_num += ret;
+ 			if (unlikely(log && ret)) {
++				/*
++				 * Since long time ago, the only user of
++				 * vq->log is vhost-net. The concern is to
++				 * add support for more devices (i.e.
++				 * vhost-scsi or vsock) may reveals unknown
++				 * issue in the vhost API. Add a WARNING.
++				 */
++				WARN_ON_ONCE(*log_num >= vq->dev->iov_limit);
++
+ 				log[*log_num].addr = vhost64_to_cpu(vq, desc.addr);
+ 				log[*log_num].len = vhost32_to_cpu(vq, desc.len);
+ 				++*log_num;
+@@ -2673,6 +2682,15 @@ int vhost_get_vq_desc(struct vhost_virtqueue *vq,
+ 			 * increment that count. */
+ 			*in_num += ret;
+ 			if (unlikely(log && ret)) {
++				/*
++				 * Since long time ago, the only user of
++				 * vq->log is vhost-net. The concern is to
++				 * add support for more devices (i.e.
++				 * vhost-scsi or vsock) may reveals unknown
++				 * issue in the vhost API. Add a WARNING.
++				 */
++				WARN_ON_ONCE(*log_num >= vq->dev->iov_limit);
++
+ 				log[*log_num].addr = vhost64_to_cpu(vq, desc.addr);
+ 				log[*log_num].len = vhost32_to_cpu(vq, desc.len);
+ 				++*log_num;
+-- 
+2.39.3
+

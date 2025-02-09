@@ -1,0 +1,62 @@
+From f363260e111d9cfbab68f533a6e6c80e901a6b10 Mon Sep 17 00:00:00 2001
+From: Dongli Zhang <dongli.zhang@oracle.com>
+Date: Wed, 5 Feb 2025 23:25:19 -0800
+Subject: [PATCH 6/9] vhost-scsi: log event queue write descriptors
+
+Log write descriptors for the event queue, leveraging vhost_get_vq_desc()
+to retrieve the array of write descriptors to obtain the log buffer.
+
+There is only one path for event queue.
+
+Suggested-by: Joao Martins <joao.m.martins@oracle.com>
+Signed-off-by: Dongli Zhang <dongli.zhang@oracle.com>
+---
+ drivers/vhost/scsi.c | 16 +++++++++++++++-
+ 1 file changed, 15 insertions(+), 1 deletion(-)
+
+diff --git a/drivers/vhost/scsi.c b/drivers/vhost/scsi.c
+index 21c2d07b806a..40268b88f470 100644
+--- a/drivers/vhost/scsi.c
++++ b/drivers/vhost/scsi.c
+@@ -498,6 +498,8 @@ vhost_scsi_do_evt_work(struct vhost_scsi *vs, struct vhost_scsi_evt *evt)
+ 	struct vhost_virtqueue *vq = &vs->vqs[VHOST_SCSI_VQ_EVT].vq;
+ 	struct virtio_scsi_event *event = &evt->event;
+ 	struct virtio_scsi_event __user *eventp;
++	struct vhost_log *vq_log;
++	unsigned int log_num;
+ 	unsigned out, in;
+ 	int head, ret;
+ 
+@@ -508,9 +510,19 @@ vhost_scsi_do_evt_work(struct vhost_scsi *vs, struct vhost_scsi_evt *evt)
+ 
+ again:
+ 	vhost_disable_notify(&vs->dev, vq);
++
++	vq_log = unlikely(vhost_has_feature(vq, VHOST_F_LOG_ALL)) ?
++		vq->log : NULL;
++
++	/*
++	 * Reset 'log_num' since vhost_get_vq_desc() may reset it only
++	 * after certain condition checks.
++	 */
++	log_num = 0;
++
+ 	head = vhost_get_vq_desc(vq, vq->iov,
+ 			ARRAY_SIZE(vq->iov), &out, &in,
+-			NULL, NULL);
++			vq_log, &log_num);
+ 	if (head < 0) {
+ 		vs->vs_events_missed = true;
+ 		return;
+@@ -540,6 +552,8 @@ vhost_scsi_do_evt_work(struct vhost_scsi *vs, struct vhost_scsi_evt *evt)
+ 		vhost_add_used_and_signal(&vs->dev, vq, head, 0);
+ 	else
+ 		vq_err(vq, "Faulted on vhost_scsi_send_event\n");
++
++	vhost_scsi_log_write(vq, vq_log, log_num);
+ }
+ 
+ static void vhost_scsi_complete_events(struct vhost_scsi *vs, bool drop)
+-- 
+2.39.3
+

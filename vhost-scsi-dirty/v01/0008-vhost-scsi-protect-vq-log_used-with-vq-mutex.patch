@@ -1,0 +1,63 @@
+From 621b3561a051d34c3789cf3acdaea6e596d143cf Mon Sep 17 00:00:00 2001
+From: Dongli Zhang <dongli.zhang@oracle.com>
+Date: Thu, 30 Jan 2025 16:24:25 -0800
+Subject: [PATCH 8/9] vhost-scsi: protect vq->log_used with vq->mutex
+
+The vhost-scsi completion path may access vq->log_base when vq->log_used is
+already set to false.
+
+    vhost-thread                       QEMU-thread
+
+vhost_scsi_complete_cmd_work()
+-> vhost_add_used()
+   -> vhost_add_used_n()
+      if (unlikely(vq->log_used))
+                                      QEMU disables vq->log_used
+                                      via VHOST_SET_VRING_ADDR.
+                                      mutex_lock(&vq->mutex);
+                                      vq->log_used = false now!
+                                      mutex_unlock(&vq->mutex);
+
+				      QEMU gfree(vq->log_base)
+        log_used()
+        -> log_write(vq->log_base)
+
+Assuming the VMM is QEMU. The vq->log_base is from QEMU userpace and can be
+reclaimed via gfree(). As a result, this causes invalid memory writes to
+QEMU userspace.
+
+The control queue path has the same issue.
+
+Signed-off-by: Dongli Zhang <dongli.zhang@oracle.com>
+---
+ drivers/vhost/scsi.c | 4 ++++
+ 1 file changed, 4 insertions(+)
+
+diff --git a/drivers/vhost/scsi.c b/drivers/vhost/scsi.c
+index 40268b88f470..3b87d698adaf 100644
+--- a/drivers/vhost/scsi.c
++++ b/drivers/vhost/scsi.c
+@@ -645,7 +645,9 @@ static void vhost_scsi_complete_cmd_work(struct vhost_work *work)
+ 		if (likely(ret == sizeof(v_rsp))) {
+ 			signal = true;
+ 
++			mutex_lock(&cmd->tvc_vq->mutex);
+ 			vhost_add_used(cmd->tvc_vq, cmd->tvc_vq_desc, 0);
++			mutex_unlock(&cmd->tvc_vq->mutex);
+ 		} else
+ 			pr_err("Faulted on virtio_scsi_cmd_resp\n");
+ 
+@@ -1371,8 +1373,10 @@ static void vhost_scsi_tmf_resp_work(struct vhost_work *work)
+ 	else
+ 		resp_code = VIRTIO_SCSI_S_FUNCTION_REJECTED;
+ 
++	mutex_lock(&tmf->svq->vq.mutex);
+ 	vhost_scsi_send_tmf_resp(tmf->vhost, &tmf->svq->vq, tmf->in_iovs,
+ 				 tmf->vq_desc, &tmf->resp_iov, resp_code);
++	mutex_unlock(&tmf->svq->vq.mutex);
+ 
+ 	if (unlikely(tmf->tmf_log_num)) {
+ 		mutex_lock(&tmf->svq->vq.mutex);
+-- 
+2.39.3
+

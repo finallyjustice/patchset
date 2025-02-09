@@ -1,0 +1,126 @@
+From 3a728321de5ea306f71840805f5f3a27426995a8 Mon Sep 17 00:00:00 2001
+From: Dongli Zhang <dongli.zhang@oracle.com>
+Date: Fri, 7 Feb 2025 00:24:41 -0800
+Subject: [PATCH 1/1] virtio-scsi: test ANY_LAYOUT
+
+This is to test ANY_LAYOUT by splitting a request into multiple descs.
+
+v6.13.
+
+Signed-off-by: Dongli Zhang <dongli.zhang@oracle.com>
+---
+ drivers/scsi/virtio_scsi.c | 38 ++++++++++++++++++++++++++++----------
+ 1 file changed, 28 insertions(+), 10 deletions(-)
+
+diff --git a/drivers/scsi/virtio_scsi.c b/drivers/scsi/virtio_scsi.c
+index 8471f38b7..8ad24f867 100644
+--- a/drivers/scsi/virtio_scsi.c
++++ b/drivers/scsi/virtio_scsi.c
+@@ -58,6 +58,8 @@ struct virtio_scsi_cmd {
+ 		struct virtio_scsi_ctrl_an_resp  an;
+ 		struct virtio_scsi_event         evt;
+ 	} resp;
++
++	u8 buf[4096];
+ } ____cacheline_aligned_in_smp;
+ 
+ struct virtio_scsi_event_node {
+@@ -116,7 +118,8 @@ static void virtscsi_complete_cmd(struct virtio_scsi *vscsi, void *buf)
+ {
+ 	struct virtio_scsi_cmd *cmd = buf;
+ 	struct scsi_cmnd *sc = cmd->sc;
+-	struct virtio_scsi_cmd_resp *resp = &cmd->resp.cmd;
++	struct virtio_scsi_cmd_resp *resp = (struct virtio_scsi_cmd_resp *)cmd->buf;
++	//struct virtio_scsi_cmd_resp *resp = &cmd->resp.cmd;
+ 
+ 	dev_dbg(&sc->device->sdev_gendev,
+ 		"cmd %p response %u status %#02x sense_len %u\n",
+@@ -428,12 +431,14 @@ static void virtscsi_event_done(struct virtqueue *vq)
+ 
+ static int __virtscsi_add_cmd(struct virtqueue *vq,
+ 			    struct virtio_scsi_cmd *cmd,
+-			    size_t req_size, size_t resp_size)
++			    size_t req_size, size_t resp_size, bool is_cmd)
+ {
+ 	struct scsi_cmnd *sc = cmd->sc;
+ 	struct scatterlist *sgs[6], req, resp;
+ 	struct sg_table *out, *in;
+ 	unsigned out_num = 0, in_num = 0;
++	struct scatterlist *header = kzalloc(sizeof(struct scatterlist)*108, GFP_KERNEL);
++	int ret;
+ 
+ 	out = in = NULL;
+ 
+@@ -456,9 +461,18 @@ static int __virtscsi_add_cmd(struct virtqueue *vq,
+ 		sgs[out_num++] = out->sgl;
+ 	}
+ 
+-	/* Response header.  */
+-	sg_init_one(&resp, &cmd->resp, resp_size);
+-	sgs[out_num + in_num++] = &resp;
++	if (is_cmd) {
++		int i;
++		memset(cmd->buf, 0, 4096);
++		for (i = 0; i < 108; i++)
++			sg_set_buf(&header[i], cmd->buf + i, 1);
++		sg_mark_end(&header[107]);
++		sgs[out_num + in_num++] = header;
++	} else {
++		/* Response header.  */
++		sg_init_one(&resp, &cmd->resp, resp_size);
++		sgs[out_num + in_num++] = &resp;
++	}
+ 
+ 	/* Data-in buffer */
+ 	if (in) {
+@@ -468,7 +482,11 @@ static int __virtscsi_add_cmd(struct virtqueue *vq,
+ 		sgs[out_num + in_num++] = in->sgl;
+ 	}
+ 
+-	return virtqueue_add_sgs(vq, sgs, out_num, in_num, cmd, GFP_ATOMIC);
++	ret = virtqueue_add_sgs(vq, sgs, out_num, in_num, cmd, GFP_ATOMIC);
++
++	kfree(header);
++
++	return ret;
+ }
+ 
+ static void virtscsi_kick_vq(struct virtio_scsi_vq *vq)
+@@ -495,14 +513,14 @@ static void virtscsi_kick_vq(struct virtio_scsi_vq *vq)
+ static int virtscsi_add_cmd(struct virtio_scsi_vq *vq,
+ 			     struct virtio_scsi_cmd *cmd,
+ 			     size_t req_size, size_t resp_size,
+-			     bool kick)
++			     bool kick, bool is_cmd)
+ {
+ 	unsigned long flags;
+ 	int err;
+ 	bool needs_kick = false;
+ 
+ 	spin_lock_irqsave(&vq->vq_lock, flags);
+-	err = __virtscsi_add_cmd(vq->vq, cmd, req_size, resp_size);
++	err = __virtscsi_add_cmd(vq->vq, cmd, req_size, resp_size, is_cmd);
+ 	if (!err && kick)
+ 		needs_kick = virtqueue_kick_prepare(vq->vq);
+ 
+@@ -599,7 +617,7 @@ static int virtscsi_queuecommand(struct Scsi_Host *shost,
+ 	}
+ 
+ 	kick = (sc->flags & SCMD_LAST) != 0;
+-	ret = virtscsi_add_cmd(req_vq, cmd, req_size, sizeof(cmd->resp.cmd), kick);
++	ret = virtscsi_add_cmd(req_vq, cmd, req_size, sizeof(cmd->resp.cmd), kick, true);
+ 	if (ret == -EIO) {
+ 		cmd->resp.cmd.response = VIRTIO_SCSI_S_BAD_TARGET;
+ 		spin_lock_irqsave(&req_vq->vq_lock, flags);
+@@ -618,7 +636,7 @@ static int virtscsi_tmf(struct virtio_scsi *vscsi, struct virtio_scsi_cmd *cmd)
+ 
+ 	cmd->comp = &comp;
+ 	if (virtscsi_add_cmd(&vscsi->ctrl_vq, cmd,
+-			      sizeof cmd->req.tmf, sizeof cmd->resp.tmf, true) < 0)
++			      sizeof cmd->req.tmf, sizeof cmd->resp.tmf, true, false) < 0)
+ 		goto out;
+ 
+ 	wait_for_completion(&comp);
+-- 
+2.39.3
+

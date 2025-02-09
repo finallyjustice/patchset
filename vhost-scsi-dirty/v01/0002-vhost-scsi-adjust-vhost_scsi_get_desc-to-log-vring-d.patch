@@ -1,0 +1,65 @@
+From dee3226b9f7de3da2a4e81faa84cbfd366ee4ad8 Mon Sep 17 00:00:00 2001
+From: Dongli Zhang <dongli.zhang@oracle.com>
+Date: Wed, 29 Jan 2025 00:06:51 -0800
+Subject: [PATCH 2/9] vhost-scsi: adjust vhost_scsi_get_desc() to log vring
+ descriptors
+
+Adjust vhost_scsi_get_desc() to facilitate logging of vring descriptors.
+
+Add new arguments to allow passing the log buffer and length to
+vhost_get_vq_desc().
+
+In addition, reset 'log_num' since vhost_get_vq_desc() may reset it only
+after certain condition checks.
+
+Suggested-by: Joao Martins <joao.m.martins@oracle.com>
+Signed-off-by: Dongli Zhang <dongli.zhang@oracle.com>
+---
+ drivers/vhost/scsi.c | 12 ++++++++----
+ 1 file changed, 8 insertions(+), 4 deletions(-)
+
+diff --git a/drivers/vhost/scsi.c b/drivers/vhost/scsi.c
+index 718fa4e0b31e..ee2310555740 100644
+--- a/drivers/vhost/scsi.c
++++ b/drivers/vhost/scsi.c
+@@ -950,13 +950,17 @@ vhost_scsi_send_bad_target(struct vhost_scsi *vs,
+ 
+ static int
+ vhost_scsi_get_desc(struct vhost_scsi *vs, struct vhost_virtqueue *vq,
+-		    struct vhost_scsi_ctx *vc)
++		    struct vhost_scsi_ctx *vc,
++		    struct vhost_log *log, unsigned int *log_num)
+ {
+ 	int ret = -ENXIO;
+ 
++	if (likely(log_num))
++		*log_num = 0;
++
+ 	vc->head = vhost_get_vq_desc(vq, vq->iov,
+ 				     ARRAY_SIZE(vq->iov), &vc->out, &vc->in,
+-				     NULL, NULL);
++				     log, log_num);
+ 
+ 	pr_debug("vhost_get_vq_desc: head: %d, out: %u in: %u\n",
+ 		 vc->head, vc->out, vc->in);
+@@ -1086,7 +1090,7 @@ vhost_scsi_handle_vq(struct vhost_scsi *vs, struct vhost_virtqueue *vq)
+ 	vhost_disable_notify(&vs->dev, vq);
+ 
+ 	do {
+-		ret = vhost_scsi_get_desc(vs, vq, &vc);
++		ret = vhost_scsi_get_desc(vs, vq, &vc, NULL, NULL);
+ 		if (ret)
+ 			goto err;
+ 
+@@ -1411,7 +1415,7 @@ vhost_scsi_ctl_handle_vq(struct vhost_scsi *vs, struct vhost_virtqueue *vq)
+ 	vhost_disable_notify(&vs->dev, vq);
+ 
+ 	do {
+-		ret = vhost_scsi_get_desc(vs, vq, &vc);
++		ret = vhost_scsi_get_desc(vs, vq, &vc, NULL, NULL);
+ 		if (ret)
+ 			goto err;
+ 
+-- 
+2.39.3
+

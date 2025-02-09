@@ -1,0 +1,90 @@
+From 86deb5cf795d009a3d4f43ba6a09c34cc230fa72 Mon Sep 17 00:00:00 2001
+From: Dongli Zhang <dongli.zhang@oracle.com>
+Date: Wed, 29 Jan 2025 00:14:48 -0800
+Subject: [PATCH 3/9] vhost-scsi: cache log buffer in I/O queue vhost_scsi_cmd
+
+The vhost-scsi I/O queue uses vhost_scsi_cmd. Pre-allocate the log buffer
+during vhost_scsi_cmd allocation, and free it when vhost_scsi_cmd is
+reclaimed.
+
+The cached log buffer will be uses in upcoming patches to log write
+descriptors for the I/O queue. The core idea is to cache the log in the
+per-command log buffer in the submission path, and use them to log write
+descriptors in the completion path.
+
+Suggested-by: Joao Martins <joao.m.martins@oracle.com>
+Signed-off-by: Dongli Zhang <dongli.zhang@oracle.com>
+---
+ drivers/vhost/scsi.c | 21 +++++++++++++++++++++
+ 1 file changed, 21 insertions(+)
+
+diff --git a/drivers/vhost/scsi.c b/drivers/vhost/scsi.c
+index ee2310555740..5e6221cbbe9e 100644
+--- a/drivers/vhost/scsi.c
++++ b/drivers/vhost/scsi.c
+@@ -98,6 +98,11 @@ struct vhost_scsi_cmd {
+ 	unsigned char tvc_cdb[VHOST_SCSI_MAX_CDB_SIZE];
+ 	/* Sense buffer that will be mapped into outgoing status */
+ 	unsigned char tvc_sense_buf[TRANSPORT_SENSE_BUFFER];
++	/*
++	 * Dirty write descriptors of this command.
++	 */
++	struct vhost_log *tvc_log;
++	unsigned int tvc_log_num;
+ 	/* Completed commands list, serviced from vhost worker thread */
+ 	struct llist_node tvc_completion_list;
+ 	/* Used to track inflight cmd */
+@@ -619,6 +624,7 @@ vhost_scsi_get_cmd(struct vhost_virtqueue *vq, struct vhost_scsi_tpg *tpg,
+ 	struct vhost_scsi_nexus *tv_nexus;
+ 	struct scatterlist *sg, *prot_sg;
+ 	struct iovec *tvc_resp_iov;
++	struct vhost_log *log;
+ 	struct page **pages;
+ 	int tag;
+ 
+@@ -639,6 +645,7 @@ vhost_scsi_get_cmd(struct vhost_virtqueue *vq, struct vhost_scsi_tpg *tpg,
+ 	prot_sg = cmd->tvc_prot_sgl;
+ 	pages = cmd->tvc_upages;
+ 	tvc_resp_iov = cmd->tvc_resp_iov;
++	log = cmd->tvc_log;
+ 	memset(cmd, 0, sizeof(*cmd));
+ 	cmd->tvc_sgl = sg;
+ 	cmd->tvc_prot_sgl = prot_sg;
+@@ -652,6 +659,7 @@ vhost_scsi_get_cmd(struct vhost_virtqueue *vq, struct vhost_scsi_tpg *tpg,
+ 	cmd->tvc_nexus = tv_nexus;
+ 	cmd->inflight = vhost_scsi_get_inflight(vq);
+ 	cmd->tvc_resp_iov = tvc_resp_iov;
++	cmd->tvc_log = log;
+ 
+ 	memcpy(cmd->tvc_cdb, cdb, VHOST_SCSI_MAX_CDB_SIZE);
+ 
+@@ -1604,6 +1612,7 @@ static void vhost_scsi_destroy_vq_cmds(struct vhost_virtqueue *vq)
+ 		kfree(tv_cmd->tvc_prot_sgl);
+ 		kfree(tv_cmd->tvc_upages);
+ 		kfree(tv_cmd->tvc_resp_iov);
++		kfree(tv_cmd->tvc_log);
+ 	}
+ 
+ 	sbitmap_free(&svq->scsi_tags);
+@@ -1666,6 +1675,18 @@ static int vhost_scsi_setup_vq_cmds(struct vhost_virtqueue *vq, int max_cmds)
+ 			pr_err("Unable to allocate tv_cmd->tvc_prot_sgl\n");
+ 			goto out;
+ 		}
++
++		/*
++		 * tv_cmd->tvc_log and vq->log need to have the same max
++		 * length.
++		 */
++		tv_cmd->tvc_log = kcalloc(vq->dev->iov_limit,
++					  sizeof(struct vhost_log),
++					  GFP_KERNEL);
++		if (!tv_cmd->tvc_log) {
++			pr_err("Unable to allocate tv_cmd->tvc_log\n");
++			goto out;
++		}
+ 	}
+ 	return 0;
+ out:
+-- 
+2.39.3
+
