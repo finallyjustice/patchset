@@ -1,0 +1,193 @@
+------------
+
+Intel, 5.15, host,vendor=AuthenticAMD.
+
+debug: has_pmu_cap=0
+debug: version=0, pmc=0, fixed=0
+debug: version=0, pmc=0, fixed=0
+debug: version=0, pmc=0, fixed=0
+debug: version=0, pmc=0, fixed=0
+
+Panic on bootup.
+
+------------
+
+Intel, 5.15, host,vendor=AuthenticAMD,-pmu.
+
+debug: has_pmu_cap=0
+debug: version=0, pmc=0, fixed=0
+debug: version=0, pmc=0, fixed=0
+debug: version=0, pmc=0, fixed=0
+debug: version=0, pmc=0, fixed=0
+
+Panic on bootup.
+
+------------
+
+Intel, 5.15, EPYC,vendor=AuthenticAMD.
+
+debug: has_pmu_cap=0
+debug: version=0, pmc=0, fixed=0
+debug: version=0, pmc=0, fixed=0
+debug: version=0, pmc=0, fixed=0
+debug: version=0, pmc=0, fixed=0
+
+[    0.371700] Performance Events: PMU not available due to virtualization, using software events only.
+[    0.376801] NMI watchdog: Perf NMI watchdog permanently disabled
+
+------------
+
+Intel, 5.15, EPYC,vendor=AuthenticAMD,+pmu.
+
+debug: has_pmu_cap=0
+debug: version=0, pmc=0, fixed=0
+debug: version=0, pmc=0, fixed=0
+debug: version=0, pmc=0, fixed=0
+debug: version=0, pmc=0, fixed=0
+
+[    0.369742] Performance Events: PMU not available due to virtualization, using software events only.
+[    0.374843] NMI watchdog: Perf NMI watchdog permanently disabled
+
+------------
+
+Intel, 5.15, EPYC,vendor=AuthenticAMD,-pmu.
+
+debug: has_pmu_cap=0
+debug: version=0, pmc=0, fixed=0
+debug: version=0, pmc=0, fixed=0
+debug: version=0, pmc=0, fixed=0
+debug: version=0, pmc=0, fixed=0
+
+[    0.370193] Performance Events: PMU not available due to virtualization, using software events only.
+[    0.375300] NMI watchdog: Perf NMI watchdog permanently disabled
+
+------------
+
+Intel, 6.13, host,vendor=AuthenticAMD.
+
+debug: has_pmu_cap=1
+debug: version=0, pmc=0, fixed=0
+debug: version=0, pmc=0, fixed=0
+debug: version=0, pmc=0, fixed=0
+debug: version=0, pmc=0, fixed=0
+
+Panic on bootup.
+
+------------
+
+Intel, 6.13, host,vendor=AuthenticAMD,-pmu.
+
+debug: has_pmu_cap=1
+debug: disable cap ret=0
+debug: version=0, pmc=0, fixed=0
+debug: version=0, pmc=0, fixed=0
+debug: version=0, pmc=0, fixed=0
+debug: version=0, pmc=0, fixed=0
+
+Panic on bootup.
+
+------------
+
+Intel, 6.13, EPYC,vendor=AuthenticAMD.
+
+debug: has_pmu_cap=1
+debug: disable cap ret=0
+debug: version=0, pmc=0, fixed=0
+debug: version=0, pmc=0, fixed=0
+debug: version=0, pmc=0, fixed=0
+debug: version=0, pmc=0, fixed=0
+
+[    0.346476] Performance Events: PMU not available due to virtualization, using software events only.
+[    0.351578] NMI watchdog: Perf NMI watchdog permanently disabled
+
+------------
+
+Intel, 6.13, EPYC,vendor=AuthenticAMD,+pmu.
+
+debug: has_pmu_cap=1
+debug: version=0, pmc=0, fixed=0
+debug: version=0, pmc=0, fixed=0
+debug: version=0, pmc=0, fixed=0
+debug: version=0, pmc=0, fixed=0
+
+[    0.351717] Performance Events: PMU not available due to virtualization, using software events only.
+[    0.356824] NMI watchdog: Perf NMI watchdog permanently disabled
+
+------------
+
+Intel, 6.13, EPYC,vendor=AuthenticAMD,-pmu.
+
+debug: has_pmu_cap=1
+debug: disable cap ret=0
+debug: version=0, pmc=0, fixed=0
+debug: version=0, pmc=0, fixed=0
+debug: version=0, pmc=0, fixed=0
+debug: version=0, pmc=0, fixed=0
+
+[    0.347782] Performance Events: PMU not available due to virtualization, using software events only.
+[    0.352868] NMI watchdog: Perf NMI watchdog permanently disabled
+
+------------
+
+Intel, 6.13 (enable_pmu=N), host,vendor=AuthenticAMD.
+
+debug: has_pmu_cap=0
+debug: version=0, pmc=0, fixed=0
+debug: version=0, pmc=0, fixed=0
+debug: version=0, pmc=0, fixed=0
+debug: version=0, pmc=0, fixed=0
+
+Panic on bootup.
+
+------------
+
+Intel, 6.13 (enable_pmu=N), host,vendor=AuthenticAMD,-pmu.
+
+debug: has_pmu_cap=0
+debug: version=0, pmc=0, fixed=0
+debug: version=0, pmc=0, fixed=0
+debug: version=0, pmc=0, fixed=0
+debug: version=0, pmc=0, fixed=0
+
+Panic on bootup.
+
+------------
+
+Intel, 6.13 (enable_pmu=N), EPYC,vendor=AuthenticAMD.
+
+debug: has_pmu_cap=0
+debug: version=0, pmc=0, fixed=0
+debug: version=0, pmc=0, fixed=0
+debug: version=0, pmc=0, fixed=0
+debug: version=0, pmc=0, fixed=0
+
+[    0.349152] Performance Events: PMU not available due to virtualization, using software events only.
+[    0.354255] NMI watchdog: Perf NMI watchdog permanently disabled
+
+------------
+
+Intel, 6.13 (enable_pmu=N), EPYC,vendor=AuthenticAMD,+pmu.
+
+debug: has_pmu_cap=0
+debug: version=0, pmc=0, fixed=0
+debug: version=0, pmc=0, fixed=0
+debug: version=0, pmc=0, fixed=0
+debug: version=0, pmc=0, fixed=0
+
+[    0.347810] Performance Events: PMU not available due to virtualization, using software events only.
+[    0.352913] NMI watchdog: Perf NMI watchdog permanently disabled
+
+------------
+
+Intel, 6.13 (enable_pmu=N), EPYC,vendor=AuthenticAMD,-pmu.
+
+debug: has_pmu_cap=0
+debug: version=0, pmc=0, fixed=0
+debug: version=0, pmc=0, fixed=0
+debug: version=0, pmc=0, fixed=0
+debug: version=0, pmc=0, fixed=0
+
+[    0.350970] Performance Events: PMU not available due to virtualization, using software events only.
+[    0.356081] NMI watchdog: Perf NMI watchdog permanently disabled
+
+------------

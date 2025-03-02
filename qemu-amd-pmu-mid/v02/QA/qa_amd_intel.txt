@@ -1,0 +1,246 @@
+------------
+
+AMD, 5.15, host,vendor=GenuineIntel.
+
+debug: has_pmu_cap=0
+debug: version=0, pmc=0, fixed=0
+debug: version=0, pmc=0, fixed=0
+debug: version=0, pmc=0, fixed=0
+debug: version=0, pmc=0, fixed=0
+
+Panic on bootup.
+
+------------
+
+AMD, 5.15, host,vendor=GenuineIntel,-pmu.
+
+debug: has_pmu_cap=0
+debug: version=0, pmc=0, fixed=0
+debug: version=0, pmc=0, fixed=0
+debug: version=0, pmc=0, fixed=0
+debug: version=0, pmc=0, fixed=0
+
+Panic on bootup.
+
+------------
+
+AMD, 5.15, Skylake-Server,vendor=GenuineIntel.
+
+debug: has_pmu_cap=0
+debug: version=0, pmc=0, fixed=0
+debug: version=0, pmc=0, fixed=0
+debug: version=0, pmc=0, fixed=0
+debug: version=0, pmc=0, fixed=0
+
+[root@vm ~]# cpuid -1 -l 0x80000001
+CPU:
+   0x80000001 0x00: eax=0x00050654 ebx=0x00000000 ecx=0x00000121 edx=0x2c100800
+[root@vm ~]# cpuid -1 -l 0x80000022
+CPU:
+   Extended Performance Monitoring and Debugging (0x80000022):
+      AMD performance monitoring V2         = true
+      AMD LBR V2                            = true
+      AMD LBR stack & PMC freezing          = true
+      number of core perf ctrs              = 0x8 (8)
+      number of LBR stack entries           = 0x18 (24)
+      number of avail Northbridge perf ctrs = 0x2 (2)
+      number of available UMC PMCs          = 0x0 (0)
+      active UMCs bitmask                   = 0x988
+
+[root@vm ~]# dmesg | grep Perf
+[    0.254499] Performance Events: unsupported p6 CPU model 85 no PMU driver, software events only.
+[    0.256578] NMI watchdog: Perf NMI watchdog permanently disabled
+
+------------
+
+AMD, 5.15, Skylake-Server,vendor=GenuineIntel,+pmu.
+
+debug: has_pmu_cap=0
+debug: version=0, pmc=0, fixed=0
+debug: version=0, pmc=0, fixed=0
+debug: version=0, pmc=0, fixed=0
+debug: version=0, pmc=0, fixed=0
+
+[root@vm ~]# cpuid -1 -l 0x80000001
+CPU:
+   0x80000001 0x00: eax=0x00050654 ebx=0x00000000 ecx=0x00000121 edx=0x2c100800
+[root@vm ~]# cpuid -1 -l 0x80000022
+CPU:
+   Extended Performance Monitoring and Debugging (0x80000022):
+      AMD performance monitoring V2         = true
+      AMD LBR V2                            = true
+      AMD LBR stack & PMC freezing          = true
+      number of core perf ctrs              = 0x8 (8)
+      number of LBR stack entries           = 0x18 (24)
+      number of avail Northbridge perf ctrs = 0x2 (2)
+      number of available UMC PMCs          = 0x0 (0)
+      active UMCs bitmask                   = 0x988
+
+[    0.256257] Performance Events: unsupported p6 CPU model 85 no PMU driver, software events only.
+[    0.258327] NMI watchdog: Perf NMI watchdog permanently disabled
+
+------------
+
+AMD, 5.15, Skylake-Server,vendor=GenuineIntel,-pmu.
+
+debug: has_pmu_cap=0
+debug: version=0, pmc=0, fixed=0
+debug: version=0, pmc=0, fixed=0
+debug: version=0, pmc=0, fixed=0
+debug: version=0, pmc=0, fixed=0
+
+[root@vm ~]# cpuid -1 -l 0x80000001
+CPU:
+   0x80000001 0x00: eax=0x00050654 ebx=0x00000000 ecx=0x00000121 edx=0x2c100800
+[root@vm ~]# cpuid -1 -l 0x80000022
+CPU:
+   Extended Performance Monitoring and Debugging (0x80000022):
+      AMD performance monitoring V2         = true
+      AMD LBR V2                            = true
+      AMD LBR stack & PMC freezing          = true
+      number of core perf ctrs              = 0x8 (8)
+      number of LBR stack entries           = 0x18 (24)
+      number of avail Northbridge perf ctrs = 0x2 (2)
+      number of available UMC PMCs          = 0x0 (0)
+      active UMCs bitmask                   = 0x988
+
+[    0.255413] Performance Events: unsupported p6 CPU model 85 no PMU driver, software events only.
+[    0.257486] NMI watchdog: Perf NMI watchdog permanently disabled
+
+------------
+
+AMD, 6.13, host,vendor=GenuineIntel.
+
+debug: has_pmu_cap=1
+debug: version=0, pmc=0, fixed=0
+debug: version=0, pmc=0, fixed=0
+debug: version=0, pmc=0, fixed=0
+debug: version=0, pmc=0, fixed=0
+
+Panic on bootup.
+
+------------
+
+AMD, 6.13, host,vendor=GenuineIntel,-pmu.
+
+debug: has_pmu_cap=1
+debug: disable cap ret=0
+debug: version=0, pmc=0, fixed=0
+debug: version=0, pmc=0, fixed=0
+debug: version=0, pmc=0, fixed=0
+debug: version=0, pmc=0, fixed=0
+
+Panic on bootup.
+
+------------
+
+AMD, 6.13, Skylake-Server,vendor=GenuineIntel.
+
+debug: has_pmu_cap=1
+debug: disable cap ret=0
+debug: version=0, pmc=0, fixed=0
+debug: version=0, pmc=0, fixed=0
+debug: version=0, pmc=0, fixed=0
+debug: version=0, pmc=0, fixed=0
+
+[root@vm ~]# dmesg | grep Perf
+[    0.246983] Performance Events: unsupported p6 CPU model 85 no PMU driver, software events only.
+[    0.249051] NMI watchdog: Perf NMI watchdog permanently disabled
+
+------------
+
+AMD, 6.13, Skylake-Server,vendor=GenuineIntel,+pmu.
+
+debug: has_pmu_cap=1
+debug: version=0, pmc=0, fixed=0
+debug: version=0, pmc=0, fixed=0
+debug: version=0, pmc=0, fixed=0
+debug: version=0, pmc=0, fixed=0
+
+[    0.245053] Performance Events: unsupported p6 CPU model 85 no PMU driver, software events only.
+[    0.247139] NMI watchdog: Perf NMI watchdog permanently disabled
+
+------------
+
+AMD, 6.13, Skylake-Server,vendor=GenuineIntel,-pmu.
+
+debug: has_pmu_cap=1
+debug: disable cap ret=0
+debug: version=0, pmc=0, fixed=0
+debug: version=0, pmc=0, fixed=0
+debug: version=0, pmc=0, fixed=0
+debug: version=0, pmc=0, fixed=0
+
+[    0.242727] Performance Events: unsupported p6 CPU model 85 no PMU driver, software events only.
+[    0.244796] NMI watchdog: Perf NMI watchdog permanently disabled
+
+------------
+
+AMD, 6.13 (enable_pmu=N), host,vendor=GenuineIntel.
+
+debug: /sys/module/kvm/parameters/enable_pmu is N
+debug: has_pmu_cap=0
+debug: version=0, pmc=0, fixed=0
+debug: version=0, pmc=0, fixed=0
+debug: version=0, pmc=0, fixed=0
+debug: version=0, pmc=0, fixed=0
+
+Panic on bootup.
+
+------------
+
+AMD, 6.13 (enable_pmu=N), host,vendor=GenuineIntel,-pmu.
+
+debug: /sys/module/kvm/parameters/enable_pmu is N
+debug: has_pmu_cap=0
+debug: version=0, pmc=0, fixed=0
+debug: version=0, pmc=0, fixed=0
+debug: version=0, pmc=0, fixed=0
+debug: version=0, pmc=0, fixed=0
+
+Panic on bootup.
+
+------------
+
+AMD, 6.13 (enable_pmu=N), Skylake-Server,vendor=GenuineIntel.
+
+debug: /sys/module/kvm/parameters/enable_pmu is N
+debug: has_pmu_cap=0
+debug: version=0, pmc=0, fixed=0
+debug: version=0, pmc=0, fixed=0
+debug: version=0, pmc=0, fixed=0
+debug: version=0, pmc=0, fixed=0
+
+[    0.244635] Performance Events: unsupported p6 CPU model 85 no PMU driver, software events only.
+[    0.246705] NMI watchdog: Perf NMI watchdog permanently disabled
+
+------------
+
+AMD, 6.13 (enable_pmu=N), Skylake-Server,vendor=GenuineIntel,+pmu.
+
+debug: /sys/module/kvm/parameters/enable_pmu is N
+debug: has_pmu_cap=0
+debug: version=0, pmc=0, fixed=0
+debug: version=0, pmc=0, fixed=0
+debug: version=0, pmc=0, fixed=0
+debug: version=0, pmc=0, fixed=0
+
+[    0.245807] Performance Events: unsupported p6 CPU model 85 no PMU driver, software events only.
+[    0.247873] NMI watchdog: Perf NMI watchdog permanently disabled
+
+------------
+
+AMD, 6.13 (enable_pmu=N), Skylake-Server,vendor=GenuineIntel,-pmu.
+
+debug: /sys/module/kvm/parameters/enable_pmu is N
+debug: has_pmu_cap=0
+debug: version=0, pmc=0, fixed=0
+debug: version=0, pmc=0, fixed=0
+debug: version=0, pmc=0, fixed=0
+debug: version=0, pmc=0, fixed=0
+
+[root@vm ~]# dmesg | grep Perf
+[    0.245038] Performance Events: unsupported p6 CPU model 85 no PMU driver, software events only.
+[    0.247111] NMI watchdog: Perf NMI watchdog permanently disabled
+
+------------

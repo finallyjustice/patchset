@@ -1,0 +1,260 @@
+------------
+
+Intel, 5.15, host.
+
+[    0.249908] Performance Events: Icelake events, full-width counters, Intel PMU driver.
+
+debug: has_pmu_cap=0
+debug: version=2, pmc=8, fixed=3
+debug: version=2, pmc=8, fixed=3
+debug: version=2, pmc=8, fixed=3
+debug: version=2, pmc=8, fixed=3
+
+------------
+
+Intel, 5.15, host,-pmu.
+
+[    0.251727] Performance Events: unsupported p6 CPU model 106 no PMU driver, software events only.
+[    0.253780] NMI watchdog: Perf NMI watchdog permanently disabled
+
+debug: has_pmu_cap=0
+debug: version=0, pmc=0, fixed=0
+debug: version=0, pmc=0, fixed=0
+debug: version=0, pmc=0, fixed=0
+debug: version=0, pmc=0, fixed=0
+
+------------
+
+Intel, 5.15, EPYC.
+
+[    0.359848] Performance Events: no PMU driver, software events only.
+[    0.362901] NMI watchdog: Perf NMI watchdog permanently disabled
+
+[root@vm ~]# cpuid -1 -l 0x80000001
+CPU:
+   0x80000001 0x00: eax=0x00800f12 ebx=0x00000000 ecx=0x00400121 edx=0x2c100800
+[root@vm ~]# cpuid -1 -l 0x80000022
+CPU:
+   Extended Performance Monitoring and Debugging (0x80000022):
+      AMD performance monitoring V2         = true
+      AMD LBR V2                            = true
+      AMD LBR stack & PMC freezing          = true
+      number of core perf ctrs              = 0x0 (0)
+      number of LBR stack entries           = 0x34 (52)
+      number of avail Northbridge perf ctrs = 0x0 (0)
+      number of available UMC PMCs          = 0x0 (0)
+      active UMCs bitmask                   = 0x340
+
+debug: has_pmu_cap=0
+debug: version=0, pmc=0, fixed=0
+debug: version=0, pmc=0, fixed=0
+debug: version=0, pmc=0, fixed=0
+debug: version=0, pmc=0, fixed=0
+
+------------
+
+Intel, 5.15, EPYC,+pmu.
+
+debug: has_pmu_cap=0
+debug: version=2, pmc=8, fixed=3
+debug: version=2, pmc=8, fixed=3
+debug: version=2, pmc=8, fixed=3
+debug: version=2, pmc=8, fixed=3
+
+[root@vm ~]# cpuid -1 -l 0xa
+CPU:
+   Architecture Performance Monitoring Features (0xa):
+      version ID                               = 0x2 (2)
+      number of counters per logical processor = 0x8 (8)
+      bit width of counter                     = 0x30 (48)
+      length of EBX bit vector                 = 0x8 (8)
+      core cycle event                         = available
+      instruction retired event                = available
+      reference cycles event                   = available
+      last-level cache ref event               = available
+      last-level cache miss event              = available
+      branch inst retired event                = available
+      branch mispred retired event             = available
+      top-down slots event                     = available
+... ...
+      number of contiguous fixed counters      = 0x3 (3)
+      bit width of fixed counters              = 0x30 (48)
+      anythread deprecation                    = true
+
+[root@vm ~]# cpuid -1 -l 0x80000001
+CPU:
+   0x80000001 0x00: eax=0x00800f12 ebx=0x00000000 ecx=0x00400121 edx=0x2c100800
+[root@vm ~]# cpuid -1 -l 0x80000022
+CPU:
+   Extended Performance Monitoring and Debugging (0x80000022):
+      AMD performance monitoring V2         = true
+      AMD LBR V2                            = true
+      AMD LBR stack & PMC freezing          = true
+      number of core perf ctrs              = 0x0 (0)
+      number of LBR stack entries           = 0x34 (52)
+      number of avail Northbridge perf ctrs = 0x0 (0)
+      number of available UMC PMCs          = 0x0 (0)
+      active UMCs bitmask                   = 0x340
+
+[    0.356383] Performance Events: generic architected perfmon, Intel PMU driver.
+
+------------
+
+Intel, 5.15, EPYC,-pmu.
+
+debug: has_pmu_cap=0
+debug: version=0, pmc=0, fixed=0
+debug: version=0, pmc=0, fixed=0
+debug: version=0, pmc=0, fixed=0
+debug: version=0, pmc=0, fixed=0
+
+[root@vm ~]# cpuid -1 -l 0x80000001
+CPU:
+   0x80000001 0x00: eax=0x00800f12 ebx=0x00000000 ecx=0x00400121 edx=0x2c100800
+[root@vm ~]# cpuid -1 -l 0x80000022
+CPU:
+   Extended Performance Monitoring and Debugging (0x80000022):
+      AMD performance monitoring V2         = true
+      AMD LBR V2                            = true
+      AMD LBR stack & PMC freezing          = true
+      number of core perf ctrs              = 0x0 (0)
+      number of LBR stack entries           = 0x34 (52)
+      number of avail Northbridge perf ctrs = 0x0 (0)
+      number of available UMC PMCs          = 0x0 (0)
+      active UMCs bitmask                   = 0x340
+
+[    0.355726] Performance Events: no PMU driver, software events only.
+[    0.358772] NMI watchdog: Perf NMI watchdog permanently disabled
+
+------------
+
+Intel, 6.13, host.
+
+debug: has_pmu_cap=1
+debug: version=2, pmc=8, fixed=3
+debug: version=2, pmc=8, fixed=3
+debug: version=2, pmc=8, fixed=3
+debug: version=2, pmc=8, fixed=3
+
+[    0.255239] Performance Events: PEBS fmt0-, Icelake events, full-width counters, Intel PMU driver.
+
+------------
+
+Intel, 6.13, host,-pmu.
+
+debug: has_pmu_cap=1
+debug: disable cap ret=0
+debug: version=0, pmc=0, fixed=0
+debug: version=0, pmc=0, fixed=0
+debug: version=0, pmc=0, fixed=0
+debug: version=0, pmc=0, fixed=0
+
+[    0.254113] Performance Events: unsupported p6 CPU model 106 no PMU driver, software events only.
+[    0.256165] NMI watchdog: Perf NMI watchdog permanently disabled
+
+------------
+
+Intel, 6.13, EPYC.
+
+debug: has_pmu_cap=1
+debug: disable cap ret=0
+debug: version=0, pmc=0, fixed=0
+debug: version=0, pmc=0, fixed=0
+debug: version=0, pmc=0, fixed=0
+debug: version=0, pmc=0, fixed=0
+
+[    0.338540] Performance Events: no PMU driver, software events only.
+[    0.341586] NMI watchdog: Perf NMI watchdog permanently disabled
+
+------------
+
+Intel, 6.13, EPYC,+pmu.
+
+debug: has_pmu_cap=1
+debug: version=2, pmc=8, fixed=3
+debug: version=2, pmc=8, fixed=3
+debug: version=2, pmc=8, fixed=3
+debug: version=2, pmc=8, fixed=3
+
+[    0.339837] Performance Events: generic architected perfmon, Intel PMU driver.
+
+------------
+
+Intel, 6.13, EPYC,-pmu.
+
+debug: has_pmu_cap=1
+debug: disable cap ret=0
+debug: version=0, pmc=0, fixed=0
+debug: version=0, pmc=0, fixed=0
+debug: version=0, pmc=0, fixed=0
+debug: version=0, pmc=0, fixed=0
+
+[    0.339810] Performance Events: no PMU driver, software events only.
+[    0.342862] NMI watchdog: Perf NMI watchdog permanently disabled
+
+------------
+
+Intel, 6.13 (enable_pmu=N), host.
+
+debug: has_pmu_cap=0
+debug: version=0, pmc=0, fixed=0
+debug: version=0, pmc=0, fixed=0
+debug: version=0, pmc=0, fixed=0
+debug: version=0, pmc=0, fixed=0
+
+[    0.254204] Performance Events: unsupported p6 CPU model 106 no PMU driver, software events only.
+[    0.256260] NMI watchdog: Perf NMI watchdog permanently disabled
+
+------------
+
+Intel, 6.13 (enable_pmu=N), host,-pmu.
+
+debug: has_pmu_cap=0
+debug: version=0, pmc=0, fixed=0
+debug: version=0, pmc=0, fixed=0
+debug: version=0, pmc=0, fixed=0
+debug: version=0, pmc=0, fixed=0
+
+[    0.254821] Performance Events: unsupported p6 CPU model 106 no PMU driver, software events only.
+[    0.256880] NMI watchdog: Perf NMI watchdog permanently disabled
+
+------------
+
+Intel, 6.13 (enable_pmu=N), EPYC.
+
+debug: has_pmu_cap=0
+debug: version=0, pmc=0, fixed=0
+debug: version=0, pmc=0, fixed=0
+debug: version=0, pmc=0, fixed=0
+debug: version=0, pmc=0, fixed=0
+
+[    0.339887] Performance Events: no PMU driver, software events only.
+[    0.342949] NMI watchdog: Perf NMI watchdog permanently disabled
+
+------------
+
+Intel, 6.13 (enable_pmu=N), EPYC,+pmu.
+
+debug: has_pmu_cap=0
+debug: version=0, pmc=0, fixed=0
+debug: version=0, pmc=0, fixed=0
+debug: version=0, pmc=0, fixed=0
+debug: version=0, pmc=0, fixed=0
+
+[    0.338791] Performance Events: no PMU driver, software events only.
+[    0.341845] NMI watchdog: Perf NMI watchdog permanently disabled
+
+------------
+
+Intel, 6.13 (enable_pmu=N), EPYC,-pmu.
+
+debug: has_pmu_cap=0
+debug: version=0, pmc=0, fixed=0
+debug: version=0, pmc=0, fixed=0
+debug: version=0, pmc=0, fixed=0
+debug: version=0, pmc=0, fixed=0
+
+[    0.338897] Performance Events: no PMU driver, software events only.
+[    0.341954] NMI watchdog: Perf NMI watchdog permanently disabled
+
+------------
