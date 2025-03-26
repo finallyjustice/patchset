@@ -1,0 +1,101 @@
+From 31ae2eb958a8a4b0b7f60de9cc82ff937bf70615 Mon Sep 17 00:00:00 2001
+From: Dongli Zhang <dongli.zhang@oracle.com>
+Date: Fri, 28 Feb 2025 16:05:14 -0800
+Subject: [PATCH v3 4/4] target/i386/kvm: set KVM_PMU_CAP_DISABLE if "-pmu" is
+ configured
+
+Although AMD PERFCORE and PerfMonV2 are removed when "-pmu" is configured,
+there is no way to fully disable KVM AMD PMU virtualization. Neither
+"-cpu host,-pmu" nor "-cpu EPYC" achieves this.
+
+As a result, the following message still appears in the VM dmesg:
+
+[    0.263615] Performance Events: AMD PMU driver.
+
+However, the expected output should be:
+
+[    0.596381] Performance Events: PMU not available due to virtualization, using software events only.
+[    0.600972] NMI watchdog: Perf NMI watchdog permanently disabled
+
+This occurs because AMD does not use any CPUID bit to indicate PMU
+availability.
+
+To address this, KVM_CAP_PMU_CAPABILITY is used to set KVM_PMU_CAP_DISABLE
+when "-pmu" is configured.
+
+Signed-off-by: Dongli Zhang <dongli.zhang@oracle.com>
+Reviewed-by: Xiaoyao Li <xiaoyao.li@intel.com>
+Reviewed-by: Zhao Liu <zhao1.liu@intel.com>
+---
+Changed since v1:
+  - Switch back to the initial implementation with "-pmu".
+https://lore.kernel.org/all/20221119122901.2469-3-dongli.zhang@oracle.com
+  - Mention that "KVM_PMU_CAP_DISABLE doesn't change the PMU behavior on
+    Intel platform because current "pmu" property works as expected."
+Changed since v2:
+  - Change has_pmu_cap to pmu_cap.
+  - Use (pmu_cap & KVM_PMU_CAP_DISABLE) instead of only pmu_cap in if
+    statement.
+
+ target/i386/kvm/kvm.c | 31 +++++++++++++++++++++++++++++++
+ 1 file changed, 31 insertions(+)
+
+diff --git a/target/i386/kvm/kvm.c b/target/i386/kvm/kvm.c
+index f41e190fb8..579c0f7e0b 100644
+--- a/target/i386/kvm/kvm.c
++++ b/target/i386/kvm/kvm.c
+@@ -176,6 +176,8 @@ static int has_triple_fault_event;
+ 
+ static bool has_msr_mcg_ext_ctl;
+ 
++static int pmu_cap;
++
+ static struct kvm_cpuid2 *cpuid_cache;
+ static struct kvm_cpuid2 *hv_cpuid_cache;
+ static struct kvm_msr_list *kvm_feature_msrs;
+@@ -2053,6 +2055,33 @@ full:
+ 
+ int kvm_arch_pre_create_vcpu(CPUState *cpu, Error **errp)
+ {
++    static bool first = true;
++    int ret;
++
++    if (first) {
++        first = false;
++
++        /*
++         * Since Linux v5.18, KVM provides a VM-level capability to easily
++         * disable PMUs; however, QEMU has been providing PMU property per
++         * CPU since v1.6. In order to accommodate both, have to configure
++         * the VM-level capability here.
++         *
++         * KVM_PMU_CAP_DISABLE doesn't change the PMU
++         * behavior on Intel platform because current "pmu" property works
++         * as expected.
++         */
++        if ((pmu_cap & KVM_PMU_CAP_DISABLE) && !X86_CPU(cpu)->enable_pmu) {
++            ret = kvm_vm_enable_cap(kvm_state, KVM_CAP_PMU_CAPABILITY, 0,
++                                    KVM_PMU_CAP_DISABLE);
++            if (ret < 0) {
++                error_setg_errno(errp, -ret,
++                                 "Failed to set KVM_PMU_CAP_DISABLE");
++                return ret;
++            }
++        }
++    }
++
+     return 0;
+ }
+ 
+@@ -3351,6 +3380,8 @@ int kvm_arch_init(MachineState *ms, KVMState *s)
+         }
+     }
+ 
++    pmu_cap = kvm_check_extension(s, KVM_CAP_PMU_CAPABILITY);
++
+     return 0;
+ }
+ 
+-- 
+2.39.3
+
