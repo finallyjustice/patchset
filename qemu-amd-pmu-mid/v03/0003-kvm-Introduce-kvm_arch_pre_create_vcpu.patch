@@ -1,7 +1,7 @@
-From 6d076002a71fcdea576571fd9567aecf749787ee Mon Sep 17 00:00:00 2001
+From a16d553966070c314be5c8524d46997be4d73b5f Mon Sep 17 00:00:00 2001
 From: Xiaoyao Li <xiaoyao.li@intel.com>
 Date: Fri, 24 Jan 2025 08:20:03 -0500
-Subject: [PATCH v3 3/4] kvm: Introduce kvm_arch_pre_create_vcpu()
+Subject: [PATCH v3 03/10] kvm: Introduce kvm_arch_pre_create_vcpu()
 
 Introduce kvm_arch_pre_create_vcpu(), to perform arch-dependent
 work prior to create any vcpu. This is for i386 TDX because it needs

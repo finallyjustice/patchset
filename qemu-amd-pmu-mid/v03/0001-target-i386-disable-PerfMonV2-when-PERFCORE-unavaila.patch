@@ -1,7 +1,7 @@
-From 4f1a623b57edd9b2f2d5a9996b9280827f71f3aa Mon Sep 17 00:00:00 2001
+From c0e55a6e5004fa3a17a3f7f8c2d0dfea434dca0f Mon Sep 17 00:00:00 2001
 From: Dongli Zhang <dongli.zhang@oracle.com>
 Date: Wed, 26 Feb 2025 12:50:28 -0800
-Subject: [PATCH v3 1/4] target/i386: disable PerfMonV2 when PERFCORE
+Subject: [PATCH v3 01/10] target/i386: disable PerfMonV2 when PERFCORE
  unavailable
 
 When the PERFCORE is disabled with "-cpu host,-perfctr-core", it is

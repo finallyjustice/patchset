@@ -1,0 +1,56 @@
+From f326cd3dbe45706affeea4f1f93f7e7513658d85 Mon Sep 17 00:00:00 2001
+From: Dongli Zhang <dongli.zhang@oracle.com>
+Date: Fri, 28 Mar 2025 13:46:34 -0700
+Subject: [PATCH v3 10/10] target/i386/kvm: don't stop Intel PMU counters
+
+The kvm_put_msrs() sets the MSRs using KVM_SET_MSRS. The x86 KVM processes
+these MSRs one by one in a loop, only saving the config and triggering the
+KVM_REQ_PMU request. This approach does not immediately stop the event
+before updating PMC.
+
+In additional, PMU MSRs are set only at levels >= KVM_PUT_RESET_STATE,
+excluding runtime. Therefore, updating these MSRs without stopping events
+should be acceptable.
+
+Finally, KVM creates kernel perf events with host mode excluded
+(exclude_host = 1). While the events remain active, they don't increment
+the counter during QEMU vCPU userspace mode.
+
+No Fixed tag is going to be added for the commit 0d89436786b0 ("kvm:
+migrate vPMU state"), because this isn't a bugfix.
+
+Signed-off-by: Dongli Zhang <dongli.zhang@oracle.com>
+---
+ target/i386/kvm/kvm.c | 9 ---------
+ 1 file changed, 9 deletions(-)
+
+diff --git a/target/i386/kvm/kvm.c b/target/i386/kvm/kvm.c
+index 3bbd70b9c6..c071a45897 100644
+--- a/target/i386/kvm/kvm.c
++++ b/target/i386/kvm/kvm.c
+@@ -4170,13 +4170,6 @@ static int kvm_put_msrs(X86CPU *cpu, int level)
+         }
+ 
+         if ((IS_INTEL_CPU(env) || IS_ZHAOXIN_CPU(env)) && pmu_version > 0) {
+-            if (pmu_version > 1) {
+-                /* Stop the counter.  */
+-                kvm_msr_entry_add(cpu, MSR_CORE_PERF_FIXED_CTR_CTRL, 0);
+-                kvm_msr_entry_add(cpu, MSR_CORE_PERF_GLOBAL_CTRL, 0);
+-            }
+-
+-            /* Set the counter values.  */
+             for (i = 0; i < num_pmu_fixed_counters; i++) {
+                 kvm_msr_entry_add(cpu, MSR_CORE_PERF_FIXED_CTR0 + i,
+                                   env->msr_fixed_counters[i]);
+@@ -4192,8 +4185,6 @@ static int kvm_put_msrs(X86CPU *cpu, int level)
+                                   env->msr_global_status);
+                 kvm_msr_entry_add(cpu, MSR_CORE_PERF_GLOBAL_OVF_CTRL,
+                                   env->msr_global_ovf_ctrl);
+-
+-                /* Now start the PMU.  */
+                 kvm_msr_entry_add(cpu, MSR_CORE_PERF_FIXED_CTR_CTRL,
+                                   env->msr_fixed_ctr_ctrl);
+                 kvm_msr_entry_add(cpu, MSR_CORE_PERF_GLOBAL_CTRL,
+-- 
+2.39.3
+

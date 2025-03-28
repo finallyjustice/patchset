@@ -1,0 +1,85 @@
+From 4150a86aca0ca887322255e0455c63cb40a03a57 Mon Sep 17 00:00:00 2001
+From: Dongli Zhang <dongli.zhang@oracle.com>
+Date: Thu, 27 Mar 2025 10:03:03 -0700
+Subject: [PATCH v3 07/10] target/i386/kvm: query kvm.enable_pmu parameter
+
+There is no way to distinguish between the following scenarios:
+
+(1) KVM_CAP_PMU_CAPABILITY is not supported.
+(2) KVM_CAP_PMU_CAPABILITY is supported but disabled via the module
+parameter kvm.enable_pmu=N.
+
+In scenario (1), there is no way to fully disable AMD PMU virtualization.
+
+In scenario (2), PMU virtualization is completely disabled by the KVM
+module.
+
+To help determine the scenario, read the kvm.enable_pmu value from the
+sysfs module parameter.
+
+There isn't any requirement to initialize 'has_pmu_version',
+'num_pmu_gp_counters' or 'num_pmu_fixed_counters', if kvm.enable_pmu=N.
+
+In addition, return error when kvm.enable_pmu=N but the user wants to enable
+vPMU.
+
+Signed-off-by: Dongli Zhang <dongli.zhang@oracle.com>
+---
+Changed since v2:
+  - Rework the code flow following Zhao's suggestion.
+  - Return error when:
+    (*kvm_enable_pmu == 'N' && X86_CPU(cpu)->enable_pmu)
+
+ target/i386/kvm/kvm.c | 36 +++++++++++++++++++++++++++++-------
+ 1 file changed, 29 insertions(+), 7 deletions(-)
+
+diff --git a/target/i386/kvm/kvm.c b/target/i386/kvm/kvm.c
+index 6b49549f1b..f68d5a0578 100644
+--- a/target/i386/kvm/kvm.c
++++ b/target/i386/kvm/kvm.c
+@@ -2051,13 +2051,35 @@ int kvm_arch_pre_create_vcpu(CPUState *cpu, Error **errp)
+          * behavior on Intel platform because current "pmu" property works
+          * as expected.
+          */
+-        if ((pmu_cap & KVM_PMU_CAP_DISABLE) && !X86_CPU(cpu)->enable_pmu) {
+-            ret = kvm_vm_enable_cap(kvm_state, KVM_CAP_PMU_CAPABILITY, 0,
+-                                    KVM_PMU_CAP_DISABLE);
+-            if (ret < 0) {
+-                error_setg_errno(errp, -ret,
+-                                 "Failed to set KVM_PMU_CAP_DISABLE");
+-                return ret;
++        if (pmu_cap) {
++            if ((pmu_cap & KVM_PMU_CAP_DISABLE) &&
++                !X86_CPU(cpu)->enable_pmu) {
++                ret = kvm_vm_enable_cap(kvm_state, KVM_CAP_PMU_CAPABILITY, 0,
++                                        KVM_PMU_CAP_DISABLE);
++                if (ret < 0) {
++                    error_setg_errno(errp, -ret,
++                                     "Failed to set KVM_PMU_CAP_DISABLE");
++                    return ret;
++                }
++            }
++        } else {
++            /*
++             * KVM_CAP_PMU_CAPABILITY is introduced in Linux v5.18. For old
++             * linux, we have to check enable_pmu parameter for vPMU support.
++             */
++            g_autofree char *kvm_enable_pmu;
++
++            /*
++             * The kvm.enable_pmu's permission is 0444. It does not change until
++             * a reload of the KVM module.
++             */
++            if (g_file_get_contents("/sys/module/kvm/parameters/enable_pmu",
++                                    &kvm_enable_pmu, NULL, NULL)) {
++                if (*kvm_enable_pmu == 'N' && X86_CPU(cpu)->enable_pmu) {
++                    error_setg(errp, "Failed to enable PMU since "
++                               "KVM's enable_pmu parameter is disabled");
++                    return -EPERM;
++                }
+             }
+         }
+     }
+-- 
+2.39.3
+

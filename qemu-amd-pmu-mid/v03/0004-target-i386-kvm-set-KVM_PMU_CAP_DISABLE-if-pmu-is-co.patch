@@ -1,8 +1,8 @@
-From 31ae2eb958a8a4b0b7f60de9cc82ff937bf70615 Mon Sep 17 00:00:00 2001
+From 754dea665e3d8ffac135b81a2bd69040034aa452 Mon Sep 17 00:00:00 2001
 From: Dongli Zhang <dongli.zhang@oracle.com>
 Date: Fri, 28 Feb 2025 16:05:14 -0800
-Subject: [PATCH v3 4/4] target/i386/kvm: set KVM_PMU_CAP_DISABLE if "-pmu" is
- configured
+Subject: [PATCH v3 04/10] target/i386/kvm: set KVM_PMU_CAP_DISABLE if "-pmu"
+ is configured
 
 Although AMD PERFCORE and PerfMonV2 are removed when "-pmu" is configured,
 there is no way to fully disable KVM AMD PMU virtualization. Neither

@@ -1,7 +1,7 @@
-From c6374f500015fbe604b3fdf212480b7e1fa6a515 Mon Sep 17 00:00:00 2001
+From 7324283aee3d855d28eda34bae4279c4395b81e1 Mon Sep 17 00:00:00 2001
 From: Dongli Zhang <dongli.zhang@oracle.com>
 Date: Fri, 28 Feb 2025 15:47:10 -0800
-Subject: [PATCH v3 2/4] target/i386: disable PERFCORE when "-pmu" is
+Subject: [PATCH v3 02/10] target/i386: disable PERFCORE when "-pmu" is
  configured
 
 Currently, AMD PMU support isn't determined based on CPUID, that is, the
