@@ -1,0 +1,337 @@
+------------
+
+Intel, 5.15, host,vendor=AuthenticAMD.
+
+qemu-system-x86_64: host doesn't support requested feature: vPMU
+orabug: pmu_cap=0
+orabug: version=0, pmc=0, fixed=0
+qemu-system-x86_64: host doesn't support requested feature: vPMU
+orabug: pmu_cap=0
+orabug: version=0, pmc=0, fixed=0
+qemu-system-x86_64: host doesn't support requested feature: vPMU
+orabug: pmu_cap=0
+orabug: version=0, pmc=0, fixed=0
+qemu-system-x86_64: host doesn't support requested feature: vPMU
+orabug: pmu_cap=0
+orabug: version=0, pmc=0, fixed=0
+
+Panic.
+
+------------
+
+Intel, 5.15, host,vendor=AuthenticAMD,-pmu.
+
+orabug: pmu_cap=0
+orabug: version=0, pmc=0, fixed=0
+orabug: pmu_cap=0
+orabug: version=0, pmc=0, fixed=0
+orabug: pmu_cap=0
+orabug: version=0, pmc=0, fixed=0
+orabug: pmu_cap=0
+orabug: version=0, pmc=0, fixed=0
+
+Panic.
+
+------------
+
+Intel, 5.15, EPYC,vendor=AuthenticAMD.
+
+orabug: pmu_cap=0
+orabug: version=0, pmc=0, fixed=0
+orabug: pmu_cap=0
+orabug: version=0, pmc=0, fixed=0
+orabug: pmu_cap=0
+orabug: version=0, pmc=0, fixed=0
+orabug: pmu_cap=0
+orabug: version=0, pmc=0, fixed=0
+
+[    0.371684] Performance Events: PMU not available due to virtualization, using software events only.
+[    0.377690] NMI watchdog: Perf NMI watchdog permanently disabled
+
+------------
+
+Intel, 5.15, EPYC,vendor=AuthenticAMD,+pmu.
+
+qemu-system-x86_64: host doesn't support requested feature: vPMU
+orabug: pmu_cap=0
+orabug: version=0, pmc=0, fixed=0
+qemu-system-x86_64: host doesn't support requested feature: vPMU
+orabug: pmu_cap=0
+orabug: version=0, pmc=0, fixed=0
+qemu-system-x86_64: host doesn't support requested feature: vPMU
+orabug: pmu_cap=0
+orabug: version=0, pmc=0, fixed=0
+qemu-system-x86_64: host doesn't support requested feature: vPMU
+orabug: pmu_cap=0
+orabug: version=0, pmc=0, fixed=0
+
+[    0.371012] Performance Events: PMU not available due to virtualization, using software events only.
+[    0.376024] NMI watchdog: Perf NMI watchdog permanently disabled
+
+[root@vm ~]# cpuid -1 -l 0xa
+CPU:
+   Architecture Performance Monitoring Features (0xa):
+      version ID                               = 0x2 (2)
+      number of counters per logical processor = 0x8 (8)
+      bit width of counter                     = 0x30 (48)
+      length of EBX bit vector                 = 0x8 (8)
+      number of contiguous fixed counters      = 0x3 (3)
+      bit width of fixed counters              = 0x30 (48)
+      anythread deprecation                    = true
+
+------------
+
+Intel, 5.15, EPYC,vendor=AuthenticAMD,-pmu.
+
+orabug: pmu_cap=0
+orabug: version=0, pmc=0, fixed=0
+orabug: pmu_cap=0
+orabug: version=0, pmc=0, fixed=0
+orabug: pmu_cap=0
+orabug: version=0, pmc=0, fixed=0
+orabug: pmu_cap=0
+orabug: version=0, pmc=0, fixed=0
+
+[    0.367236] Performance Events: PMU not available due to virtualization, using software events only.
+[    0.372340] NMI watchdog: Perf NMI watchdog permanently disabled
+
+------------
+
+Intel, 6.13, host,vendor=AuthenticAMD.
+
+qemu-system-x86_64: host doesn't support requested feature: vPMU
+orabug: pmu_cap=1
+orabug: version=0, pmc=0, fixed=0
+qemu-system-x86_64: host doesn't support requested feature: vPMU
+orabug: pmu_cap=1
+orabug: version=0, pmc=0, fixed=0
+qemu-system-x86_64: host doesn't support requested feature: vPMU
+orabug: pmu_cap=1
+orabug: version=0, pmc=0, fixed=0
+qemu-system-x86_64: host doesn't support requested feature: vPMU
+orabug: pmu_cap=1
+orabug: version=0, pmc=0, fixed=0
+
+Panic.
+
+------------
+
+Intel, 6.13, host,vendor=AuthenticAMD,-pmu.
+
+orabug: pmu_cap=1
+orabug: version=0, pmc=0, fixed=0
+orabug: pmu_cap=1
+orabug: version=0, pmc=0, fixed=0
+orabug: pmu_cap=1
+orabug: version=0, pmc=0, fixed=0
+orabug: pmu_cap=1
+orabug: version=0, pmc=0, fixed=0
+
+Panic.
+
+------------
+
+Intel, 6.13, EPYC,vendor=AuthenticAMD.
+
+orabug: pmu_cap=1
+orabug: version=0, pmc=0, fixed=0
+orabug: pmu_cap=1
+orabug: version=0, pmc=0, fixed=0
+orabug: pmu_cap=1
+orabug: version=0, pmc=0, fixed=0
+orabug: pmu_cap=1
+orabug: version=0, pmc=0, fixed=0
+
+[    0.348899] Performance Events: PMU not available due to virtualization, using software events only.
+[    0.354016] NMI watchdog: Perf NMI watchdog permanently disabled
+
+------------
+
+Intel, 6.13, EPYC,vendor=AuthenticAMD,+pmu.
+
+qemu-system-x86_64: host doesn't support requested feature: vPMU
+orabug: pmu_cap=1
+orabug: version=0, pmc=0, fixed=0
+qemu-system-x86_64: host doesn't support requested feature: vPMU
+orabug: pmu_cap=1
+orabug: version=0, pmc=0, fixed=0
+qemu-system-x86_64: host doesn't support requested feature: vPMU
+orabug: pmu_cap=1
+orabug: version=0, pmc=0, fixed=0
+qemu-system-x86_64: host doesn't support requested feature: vPMU
+orabug: pmu_cap=1
+orabug: version=0, pmc=0, fixed=0
+
+[    0.347922] Performance Events: PMU not available due to virtualization, using software events only.
+[    0.352688] NMI watchdog: Perf NMI watchdog permanently disabled
+
+[root@vm ~]# cpuid -1 -l 0xa
+CPU:
+   Architecture Performance Monitoring Features (0xa):
+      version ID                               = 0x2 (2)
+      number of counters per logical processor = 0x8 (8)
+      bit width of counter                     = 0x30 (48)
+      length of EBX bit vector                 = 0x8 (8)
+      number of contiguous fixed counters      = 0x3 (3)
+      bit width of fixed counters              = 0x30 (48)
+      anythread deprecation                    = true
+
+------------
+
+Intel, 6.13, EPYC,vendor=AuthenticAMD,-pmu.
+
+orabug: pmu_cap=1
+orabug: version=0, pmc=0, fixed=0
+orabug: pmu_cap=1
+orabug: version=0, pmc=0, fixed=0
+orabug: pmu_cap=1
+orabug: version=0, pmc=0, fixed=0
+orabug: pmu_cap=1
+orabug: version=0, pmc=0, fixed=0
+
+[    0.343312] Performance Events: PMU not available due to virtualization, using software events only.
+[    0.348429] NMI watchdog: Perf NMI watchdog permanently disabled
+
+------------
+
+Intel, 6.13, host,vendor="CentaurHauls",+pmu
+
+orabug: IS compatible!
+orabug: pmu_cap=1
+orabug: version=2, pmc=8, fixed=3
+orabug: IS compatible!
+orabug: pmu_cap=1
+orabug: version=2, pmc=8, fixed=3
+orabug: IS compatible!
+orabug: pmu_cap=1
+orabug: version=2, pmc=8, fixed=3
+orabug: IS compatible!
+orabug: pmu_cap=1
+orabug: version=2, pmc=8, fixed=3
+orabug: kvm_put_msrs() reset Intel or Zhaoxin level=3
+orabug: kvm_put_msrs() reset Intel or Zhaoxin level=3
+orabug: kvm_put_msrs() reset Intel or Zhaoxin level=3
+orabug: kvm_put_msrs() reset Intel or Zhaoxin level=3
+orabug: kvm_get_msrs() reset Intel or Zhaoxin
+orabug: kvm_get_msrs() reset Intel or Zhaoxin
+orabug: kvm_get_msrs() reset Intel or Zhaoxin
+orabug: kvm_get_msrs() reset Intel or Zhaoxin
+
+[    0.253327] Performance Events:
+[    0.256391] NMI watchdog: Perf NMI watchdog permanently disabled
+
+[root@vm ~]# cpuid -1 -l 0xa
+CPU:
+   Architecture Performance Monitoring Features (0xa):
+      version ID                               = 0x2 (2)
+      number of counters per logical processor = 0x8 (8)
+      bit width of counter                     = 0x30 (48)
+      length of EBX bit vector                 = 0x8 (8)
+      number of contiguous fixed counters      = 0x3 (3)
+      bit width of fixed counters              = 0x30 (48)
+      anythread deprecation                    = true
+
+------------
+
+Intel, 6.13, YongFeng,vendor="CentaurHauls",+pmu
+
+orabug: IS compatible!
+orabug: pmu_cap=1
+orabug: version=2, pmc=8, fixed=3
+orabug: IS compatible!
+orabug: pmu_cap=1
+orabug: version=2, pmc=8, fixed=3
+orabug: IS compatible!
+orabug: pmu_cap=1
+orabug: version=2, pmc=8, fixed=3
+orabug: IS compatible!
+orabug: pmu_cap=1
+orabug: version=2, pmc=8, fixed=3
+orabug: kvm_put_msrs() reset Intel or Zhaoxin level=3
+orabug: kvm_put_msrs() reset Intel or Zhaoxin level=3
+orabug: kvm_put_msrs() reset Intel or Zhaoxin level=3
+orabug: kvm_put_msrs() reset Intel or Zhaoxin level=3
+orabug: kvm_get_msrs() reset Intel or Zhaoxin
+orabug: kvm_get_msrs() reset Intel or Zhaoxin
+orabug: kvm_get_msrs() reset Intel or Zhaoxin
+orabug: kvm_get_msrs() reset Intel or Zhaoxin
+
+[    0.262028] Performance Events: 
+[    0.265108] NMI watchdog: Perf NMI watchdog permanently disabled
+
+[root@vm ~]# cpuid -1 -l 0xa
+CPU:
+   Architecture Performance Monitoring Features (0xa):
+      version ID                               = 0x2 (2)
+      number of counters per logical processor = 0x8 (8)
+      bit width of counter                     = 0x30 (48)
+      length of EBX bit vector                 = 0x8 (8)
+      number of contiguous fixed counters      = 0x3 (3)
+      bit width of fixed counters              = 0x30 (48)
+      anythread deprecation                    = true
+
+------------
+
+Intel, 6.13 (enable_pmu=N), host,vendor=AuthenticAMD.
+
+orabug: /sys/module/kvm/parameters/enable_pmu is N
+qemu-system-x86_64: Failed to enable PMU since KVM's enable_pmu parameter is disabled
+
+------------
+
+Intel, 6.13 (enable_pmu=N), host,vendor=AuthenticAMD,-pmu.
+
+orabug: /sys/module/kvm/parameters/enable_pmu is N
+orabug: pmu_cap=0
+orabug: version=0, pmc=0, fixed=0
+orabug: pmu_cap=0
+orabug: version=0, pmc=0, fixed=0
+orabug: pmu_cap=0
+orabug: version=0, pmc=0, fixed=0
+orabug: pmu_cap=0
+orabug: version=0, pmc=0, fixed=0
+
+Panic.
+
+------------
+
+Intel, 6.13 (enable_pmu=N), EPYC,vendor=AuthenticAMD.
+
+orabug: /sys/module/kvm/parameters/enable_pmu is N
+orabug: pmu_cap=0
+orabug: version=0, pmc=0, fixed=0
+orabug: pmu_cap=0
+orabug: version=0, pmc=0, fixed=0
+orabug: pmu_cap=0
+orabug: version=0, pmc=0, fixed=0
+orabug: pmu_cap=0
+orabug: version=0, pmc=0, fixed=0
+
+[    0.346644] Performance Events: PMU not available due to virtualization, using software events only.
+[    0.351754] NMI watchdog: Perf NMI watchdog permanently disabled
+
+------------
+
+Intel, 6.13 (enable_pmu=N), EPYC,vendor=AuthenticAMD,+pmu.
+
+orabug: /sys/module/kvm/parameters/enable_pmu is N
+qemu-system-x86_64: Failed to enable PMU since KVM's enable_pmu parameter is disabled
+
+------------
+
+Intel, 6.13 (enable_pmu=N), EPYC,vendor=AuthenticAMD,-pmu.
+
+orabug: /sys/module/kvm/parameters/enable_pmu is N
+orabug: pmu_cap=0
+orabug: version=0, pmc=0, fixed=0
+orabug: pmu_cap=0
+orabug: version=0, pmc=0, fixed=0
+orabug: pmu_cap=0
+orabug: version=0, pmc=0, fixed=0
+orabug: pmu_cap=0
+orabug: version=0, pmc=0, fixed=0
+
+[    0.345843] Performance Events: PMU not available due to virtualization, using software events only.
+[    0.350957] NMI watchdog: Perf NMI watchdog permanently disabled
+
+------------

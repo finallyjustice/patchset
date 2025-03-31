@@ -1,4 +1,4 @@
-From c4adb509e67e9d438a78ecdecd8922a050c92461 Mon Sep 17 00:00:00 2001
+From 8f0ec022bf5bc8ec5aa538d39b2e9650d6545f2b Mon Sep 17 00:00:00 2001
 From: Dongli Zhang <dongli.zhang@oracle.com>
 Date: Wed, 26 Mar 2025 21:59:13 -0700
 Subject: [PATCH v3 05/10] target/i386/kvm: extract unrelated code out of

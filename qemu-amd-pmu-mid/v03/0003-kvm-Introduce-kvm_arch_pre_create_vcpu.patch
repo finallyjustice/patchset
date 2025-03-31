@@ -1,4 +1,4 @@
-From a16d553966070c314be5c8524d46997be4d73b5f Mon Sep 17 00:00:00 2001
+From fdfc6d76bee0b0e8abd9c21d17d5b773fa33fa21 Mon Sep 17 00:00:00 2001
 From: Xiaoyao Li <xiaoyao.li@intel.com>
 Date: Fri, 24 Jan 2025 08:20:03 -0500
 Subject: [PATCH v3 03/10] kvm: Introduce kvm_arch_pre_create_vcpu()

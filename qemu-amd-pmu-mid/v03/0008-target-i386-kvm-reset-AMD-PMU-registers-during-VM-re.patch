@@ -1,6 +1,6 @@
-From 331e5e9d63986dc65a093a704b6295845a53fb6d Mon Sep 17 00:00:00 2001
+From 60fe468bdcdc496b4ae7d953024cec1515932829 Mon Sep 17 00:00:00 2001
 From: Dongli Zhang <dongli.zhang@oracle.com>
-Date: Fri, 28 Mar 2025 13:27:39 -0700
+Date: Sun, 30 Mar 2025 00:58:30 -0700
 Subject: [PATCH v3 08/10] target/i386/kvm: reset AMD PMU registers during VM
  reset
 
@@ -56,7 +56,7 @@ Changed since v2:
   - Move "if (!cpu->enable_pmu)" to begin of function. Add comments to
     reminder developers.
   - Add support to Zhaoxin. Change is_same_vendor() to
-    is_host_compat_vendor(). 
+    is_host_compat_vendor().
   - Didn't add Reviewed-by from Sandipan because the change isn't minor.
 
 TODO:
@@ -65,8 +65,8 @@ TODO:
     may help move those helpers to target/i386/cpu*.
 
  target/i386/cpu.h     |   8 ++
- target/i386/kvm/kvm.c | 177 +++++++++++++++++++++++++++++++++++++++++-
- 2 files changed, 181 insertions(+), 4 deletions(-)
+ target/i386/kvm/kvm.c | 176 +++++++++++++++++++++++++++++++++++++++++-
+ 2 files changed, 180 insertions(+), 4 deletions(-)
 
 diff --git a/target/i386/cpu.h b/target/i386/cpu.h
 index 76f24446a5..84e497f5d3 100644
@@ -88,7 +88,7 @@ index 76f24446a5..84e497f5d3 100644
  #define MSR_MC0_STATUS                  0x401
  #define MSR_MC0_ADDR                    0x402
 diff --git a/target/i386/kvm/kvm.c b/target/i386/kvm/kvm.c
-index f68d5a0578..0982bc4dc7 100644
+index f68d5a0578..3a35fd741d 100644
 --- a/target/i386/kvm/kvm.c
 +++ b/target/i386/kvm/kvm.c
 @@ -2087,7 +2087,7 @@ int kvm_arch_pre_create_vcpu(CPUState *cpu, Error **errp)
@@ -100,7 +100,7 @@ index f68d5a0578..0982bc4dc7 100644
  {
      struct kvm_cpuid_entry2 *c;
  
-@@ -2120,6 +2120,99 @@ static void kvm_init_pmu_info(struct kvm_cpuid2 *cpuid)
+@@ -2120,6 +2120,97 @@ static void kvm_init_pmu_info(struct kvm_cpuid2 *cpuid)
      }
  }
  
@@ -108,8 +108,6 @@ index f68d5a0578..0982bc4dc7 100644
 +{
 +    struct kvm_cpuid_entry2 *c;
 +    int64_t family;
-+
-+    pmu_version = 0;
 +
 +    family = object_property_get_int(OBJECT(cpu), "family", NULL);
 +    if (family < 0) {
@@ -200,7 +198,7 @@ index f68d5a0578..0982bc4dc7 100644
  int kvm_arch_init_vcpu(CPUState *cs)
  {
      struct {
-@@ -2302,7 +2395,7 @@ int kvm_arch_init_vcpu(CPUState *cs)
+@@ -2302,7 +2393,7 @@ int kvm_arch_init_vcpu(CPUState *cs)
      cpuid_i = kvm_x86_build_cpuid(env, cpuid_data.entries, cpuid_i);
      cpuid_data.cpuid.nent = cpuid_i;
  
@@ -209,7 +207,7 @@ index f68d5a0578..0982bc4dc7 100644
  
      if (((env->cpuid_version >> 8)&0xF) >= 6
          && (env->features[FEAT_1_EDX] & (CPUID_MCE | CPUID_MCA)) ==
-@@ -4066,7 +4159,7 @@ static int kvm_put_msrs(X86CPU *cpu, int level)
+@@ -4066,7 +4157,7 @@ static int kvm_put_msrs(X86CPU *cpu, int level)
              kvm_msr_entry_add(cpu, MSR_KVM_POLL_CONTROL, env->poll_control_msr);
          }
  
@@ -218,7 +216,7 @@ index f68d5a0578..0982bc4dc7 100644
              if (pmu_version > 1) {
                  /* Stop the counter.  */
                  kvm_msr_entry_add(cpu, MSR_CORE_PERF_FIXED_CTR_CTRL, 0);
-@@ -4097,6 +4190,38 @@ static int kvm_put_msrs(X86CPU *cpu, int level)
+@@ -4097,6 +4188,38 @@ static int kvm_put_msrs(X86CPU *cpu, int level)
                                    env->msr_global_ctrl);
              }
          }
@@ -257,16 +255,17 @@ index f68d5a0578..0982bc4dc7 100644
          /*
           * Hyper-V partition-wide MSRs: to avoid clearing them on cpu hot-add,
           * only sync them to KVM on the first cpu
-@@ -4544,7 +4669,7 @@ static int kvm_get_msrs(X86CPU *cpu)
+@@ -4544,7 +4667,8 @@ static int kvm_get_msrs(X86CPU *cpu)
      if (env->features[FEAT_KVM] & CPUID_KVM_POLL_CONTROL) {
          kvm_msr_entry_add(cpu, MSR_KVM_POLL_CONTROL, 1);
      }
 -    if (pmu_version > 0) {
++
 +    if ((IS_INTEL_CPU(env) || IS_ZHAOXIN_CPU(env)) && pmu_version > 0) {
          if (pmu_version > 1) {
              kvm_msr_entry_add(cpu, MSR_CORE_PERF_FIXED_CTR_CTRL, 0);
              kvm_msr_entry_add(cpu, MSR_CORE_PERF_GLOBAL_CTRL, 0);
-@@ -4560,6 +4685,35 @@ static int kvm_get_msrs(X86CPU *cpu)
+@@ -4560,6 +4684,35 @@ static int kvm_get_msrs(X86CPU *cpu)
          }
      }
  
@@ -302,7 +301,7 @@ index f68d5a0578..0982bc4dc7 100644
      if (env->mcg_cap) {
          kvm_msr_entry_add(cpu, MSR_MCG_STATUS, 0);
          kvm_msr_entry_add(cpu, MSR_MCG_CTL, 0);
-@@ -4871,6 +5025,21 @@ static int kvm_get_msrs(X86CPU *cpu)
+@@ -4871,6 +5024,21 @@ static int kvm_get_msrs(X86CPU *cpu)
          case MSR_P6_EVNTSEL0 ... MSR_P6_EVNTSEL0 + MAX_GP_COUNTERS - 1:
              env->msr_gp_evtsel[index - MSR_P6_EVNTSEL0] = msrs[i].data;
              break;

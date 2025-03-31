@@ -1,4 +1,4 @@
-From f326cd3dbe45706affeea4f1f93f7e7513658d85 Mon Sep 17 00:00:00 2001
+From 7a7c2db489df3b44ca93b14eaa38143e122d3265 Mon Sep 17 00:00:00 2001
 From: Dongli Zhang <dongli.zhang@oracle.com>
 Date: Fri, 28 Mar 2025 13:46:34 -0700
 Subject: [PATCH v3 10/10] target/i386/kvm: don't stop Intel PMU counters
@@ -25,7 +25,7 @@ Signed-off-by: Dongli Zhang <dongli.zhang@oracle.com>
  1 file changed, 9 deletions(-)
 
 diff --git a/target/i386/kvm/kvm.c b/target/i386/kvm/kvm.c
-index 3bbd70b9c6..c071a45897 100644
+index 4c3908e09e..d9c6c9905e 100644
 --- a/target/i386/kvm/kvm.c
 +++ b/target/i386/kvm/kvm.c
 @@ -4170,13 +4170,6 @@ static int kvm_put_msrs(X86CPU *cpu, int level)

@@ -1,4 +1,4 @@
-From 754dea665e3d8ffac135b81a2bd69040034aa452 Mon Sep 17 00:00:00 2001
+From 172ef425dddc17f8132eadf8b2bfdfe74cfa3b95 Mon Sep 17 00:00:00 2001
 From: Dongli Zhang <dongli.zhang@oracle.com>
 Date: Fri, 28 Feb 2025 16:05:14 -0800
 Subject: [PATCH v3 04/10] target/i386/kvm: set KVM_PMU_CAP_DISABLE if "-pmu"
@@ -36,6 +36,7 @@ Changed since v2:
   - Change has_pmu_cap to pmu_cap.
   - Use (pmu_cap & KVM_PMU_CAP_DISABLE) instead of only pmu_cap in if
     statement.
+  - Add Reviewed-by from Xiaoyao and Zhao as the change is minor.
 
  target/i386/kvm/kvm.c | 31 +++++++++++++++++++++++++++++++
  1 file changed, 31 insertions(+)

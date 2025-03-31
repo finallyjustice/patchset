@@ -1,0 +1,409 @@
+------------
+
+AMD, 5.15, host.
+
+orabug: pmu_cap=0
+orabug: version=1, pmc=6, fixed=0
+orabug: pmu_cap=0
+orabug: version=1, pmc=6, fixed=0
+orabug: pmu_cap=0
+orabug: version=1, pmc=6, fixed=0
+orabug: pmu_cap=0
+orabug: version=1, pmc=6, fixed=0
+orabug: kvm_get_msrs() reset AMD
+orabug: kvm_get_msrs() reset AMD
+orabug: kvm_get_msrs() reset AMD
+orabug: kvm_get_msrs() reset AMD
+orabug: kvm_put_msrs() reset AMD
+orabug: kvm_put_msrs() reset AMD
+orabug: kvm_put_msrs() reset AMD
+orabug: kvm_put_msrs() reset AMD
+
+[    0.262382] Performance Events: Fam17h+ core perfctr, AMD PMU driver.
+
+[root@vm ~]# cpuid -1 -l 0x80000022
+CPU:
+   Extended Performance Monitoring and Debugging (0x80000022):
+      AMD performance monitoring V2         = false
+      AMD LBR V2                            = false
+      AMD LBR stack & PMC freezing          = false
+      number of core perf ctrs              = 0x0 (0)
+      number of LBR stack entries           = 0x0 (0)
+      number of avail Northbridge perf ctrs = 0x0 (0)
+      number of available UMC PMCs          = 0x0 (0)
+      active UMCs bitmask                   = 0x0
+
+------------
+
+AMD, 5.15, host,-pmu.
+
+orabug: pmu_cap=0
+orabug: version=0, pmc=0, fixed=0
+orabug: pmu_cap=0
+orabug: version=0, pmc=0, fixed=0
+orabug: pmu_cap=0
+orabug: version=0, pmc=0, fixed=0
+orabug: pmu_cap=0
+orabug: version=0, pmc=0, fixed=0
+
+[    0.263261] Performance Events: AMD PMU driver.
+
+[root@vm ~]# cpuid -1 -l 0x80000022
+CPU:
+   Extended Performance Monitoring and Debugging (0x80000022):
+      AMD performance monitoring V2         = false
+      AMD LBR V2                            = false
+      AMD LBR stack & PMC freezing          = false
+      number of core perf ctrs              = 0x0 (0)
+      number of LBR stack entries           = 0x0 (0)
+      number of avail Northbridge perf ctrs = 0x0 (0)
+      number of available UMC PMCs          = 0x0 (0)
+      active UMCs bitmask                   = 0x0
+
+------------
+
+AMD, 5.15, Skylake-Server.
+
+orabug: pmu_cap=0
+orabug: version=0, pmc=0, fixed=0
+orabug: pmu_cap=0
+orabug: version=0, pmc=0, fixed=0
+orabug: pmu_cap=0
+orabug: version=0, pmc=0, fixed=0
+orabug: pmu_cap=0
+orabug: version=0, pmc=0, fixed=0
+
+[    0.248786] Performance Events: AMD PMU driver.
+
+[root@vm ~]# cpuid -1 -l 0x80000022
+CPU:
+   Extended Performance Monitoring and Debugging (0x80000022):
+      AMD performance monitoring V2         = false
+      AMD LBR V2                            = false
+      AMD LBR stack & PMC freezing          = false
+      number of core perf ctrs              = 0x0 (0)
+      number of LBR stack entries           = 0x0 (0)
+      number of avail Northbridge perf ctrs = 0x0 (0)
+      number of available UMC PMCs          = 0x0 (0)
+      active UMCs bitmask                   = 0x0
+
+------------
+
+AMD, 5.15, Skylake-Server,+pmu.
+
+orabug: pmu_cap=0
+orabug: version=1, pmc=4, fixed=0
+orabug: pmu_cap=0
+orabug: version=1, pmc=4, fixed=0
+orabug: pmu_cap=0
+orabug: version=1, pmc=4, fixed=0
+orabug: pmu_cap=0
+orabug: version=1, pmc=4, fixed=0
+orabug: kvm_get_msrs() reset AMD
+orabug: kvm_get_msrs() reset AMD
+orabug: kvm_get_msrs() reset AMD
+orabug: kvm_get_msrs() reset AMD
+orabug: kvm_put_msrs() reset AMD
+orabug: kvm_put_msrs() reset AMD
+orabug: kvm_put_msrs() reset AMD
+orabug: kvm_put_msrs() reset AMD
+
+[    0.248131] Performance Events: AMD PMU driver.
+
+[root@vm ~]# cpuid -1 -l 0x80000022
+CPU:
+   Extended Performance Monitoring and Debugging (0x80000022):
+      AMD performance monitoring V2         = false
+      AMD LBR V2                            = false
+      AMD LBR stack & PMC freezing          = false
+      number of core perf ctrs              = 0x0 (0)
+      number of LBR stack entries           = 0x0 (0)
+      number of avail Northbridge perf ctrs = 0x0 (0)
+      number of available UMC PMCs          = 0x0 (0)
+      active UMCs bitmask                   = 0x0
+
+------------
+
+AMD, 5.15, Skylake-Server,-pmu.
+
+orabug: pmu_cap=0
+orabug: version=0, pmc=0, fixed=0
+orabug: pmu_cap=0
+orabug: version=0, pmc=0, fixed=0
+orabug: pmu_cap=0
+orabug: version=0, pmc=0, fixed=0
+orabug: pmu_cap=0
+orabug: version=0, pmc=0, fixed=0
+
+[    0.248295] Performance Events: AMD PMU driver.
+
+[root@vm ~]# cpuid -1 -l 0x80000022
+CPU:
+   Extended Performance Monitoring and Debugging (0x80000022):
+      AMD performance monitoring V2         = false
+      AMD LBR V2                            = false
+      AMD LBR stack & PMC freezing          = false
+      number of core perf ctrs              = 0x0 (0)
+      number of LBR stack entries           = 0x0 (0)
+      number of avail Northbridge perf ctrs = 0x0 (0)
+      number of available UMC PMCs          = 0x0 (0)
+      active UMCs bitmask                   = 0x0
+
+------------
+
+AMD, 6.13, host.
+
+orabug: pmu_cap=1
+orabug: version=2, pmc=6, fixed=0
+orabug: pmu_cap=1
+orabug: version=2, pmc=6, fixed=0
+orabug: pmu_cap=1
+orabug: version=2, pmc=6, fixed=0
+orabug: pmu_cap=1
+orabug: version=2, pmc=6, fixed=0
+orabug: kvm_get_msrs() reset AMD
+orabug: kvm_get_msrs() reset AMD
+orabug: kvm_get_msrs() reset AMD
+orabug: kvm_get_msrs() reset AMD
+orabug: kvm_put_msrs() reset AMD
+orabug: kvm_put_msrs() reset AMD
+orabug: kvm_put_msrs() reset AMD
+orabug: kvm_put_msrs() reset AMD
+
+[root@vm ~]# dmesg | grep Perf
+[    0.252382] Performance Events: Fam17h+ core perfctr, AMD PMU driver.
+
+[root@vm ~]# cpuid -1 -l 0x80000022
+CPU:
+   Extended Performance Monitoring and Debugging (0x80000022):
+      AMD performance monitoring V2         = true
+      AMD LBR V2                            = false
+      AMD LBR stack & PMC freezing          = false
+      number of core perf ctrs              = 0x6 (6)
+      number of LBR stack entries           = 0x0 (0)
+      number of avail Northbridge perf ctrs = 0x0 (0)
+      number of available UMC PMCs          = 0x0 (0)
+      active UMCs bitmask                   = 0x0
+
+------------
+
+AMD, 6.13, host,-pmu.
+
+orabug: pmu_cap=1
+orabug: version=0, pmc=0, fixed=0
+orabug: pmu_cap=1
+orabug: version=0, pmc=0, fixed=0
+orabug: pmu_cap=1
+orabug: version=0, pmc=0, fixed=0
+orabug: pmu_cap=1
+orabug: version=0, pmc=0, fixed=0
+
+[root@vm ~]# dmesg | grep Perf
+[    0.253940] Performance Events: PMU not available due to virtualization, using software events only.
+[    0.257048] NMI watchdog: Perf NMI watchdog permanently disabled
+
+[root@vm ~]# cpuid -1 -l 0x80000022
+CPU:
+   Extended Performance Monitoring and Debugging (0x80000022):
+      AMD performance monitoring V2         = false
+      AMD LBR V2                            = false
+      AMD LBR stack & PMC freezing          = false
+      number of core perf ctrs              = 0x0 (0)
+      number of LBR stack entries           = 0x0 (0)
+      number of avail Northbridge perf ctrs = 0x0 (0)
+      number of available UMC PMCs          = 0x0 (0)
+      active UMCs bitmask                   = 0x0
+
+------------
+
+AMD, 6.13, Skylake-Server.
+
+orabug: pmu_cap=1
+orabug: version=0, pmc=0, fixed=0
+orabug: pmu_cap=1
+orabug: version=0, pmc=0, fixed=0
+orabug: pmu_cap=1
+orabug: version=0, pmc=0, fixed=0
+orabug: pmu_cap=1
+orabug: version=0, pmc=0, fixed=0
+
+[    0.239327] Performance Events: PMU not available due to virtualization, using software events only.
+[    0.242401] NMI watchdog: Perf NMI watchdog permanently disabled
+
+[root@vm ~]# cpuid -1 -l 0x80000022
+CPU:
+   Extended Performance Monitoring and Debugging (0x80000022):
+      AMD performance monitoring V2         = false
+      AMD LBR V2                            = false
+      AMD LBR stack & PMC freezing          = false
+      number of core perf ctrs              = 0x0 (0)
+      number of LBR stack entries           = 0x0 (0)
+      number of avail Northbridge perf ctrs = 0x0 (0)
+      number of available UMC PMCs          = 0x0 (0)
+      active UMCs bitmask                   = 0x0
+
+------------
+
+AMD, 6.13, Skylake-Server,+pmu.
+
+orabug: pmu_cap=1
+orabug: version=1, pmc=4, fixed=0
+orabug: pmu_cap=1
+orabug: version=1, pmc=4, fixed=0
+orabug: pmu_cap=1
+orabug: version=1, pmc=4, fixed=0
+orabug: pmu_cap=1
+orabug: version=1, pmc=4, fixed=0
+orabug: kvm_get_msrs() reset AMD
+orabug: kvm_get_msrs() reset AMD
+orabug: kvm_get_msrs() reset AMD
+orabug: kvm_get_msrs() reset AMD
+orabug: kvm_put_msrs() reset AMD
+orabug: kvm_put_msrs() reset AMD
+orabug: kvm_put_msrs() reset AMD
+orabug: kvm_put_msrs() reset AMD
+
+[    0.239671] Performance Events: AMD PMU driver.
+
+[root@vm ~]# cpuid -1 -l 0x80000022
+CPU:
+   Extended Performance Monitoring and Debugging (0x80000022):
+      AMD performance monitoring V2         = false
+      AMD LBR V2                            = false
+      AMD LBR stack & PMC freezing          = false
+      number of core perf ctrs              = 0x0 (0)
+      number of LBR stack entries           = 0x0 (0)
+      number of avail Northbridge perf ctrs = 0x0 (0)
+      number of available UMC PMCs          = 0x0 (0)
+      active UMCs bitmask                   = 0x0
+
+------------
+
+AMD, 6.13, Skylake-Server,-pmu.
+
+orabug: pmu_cap=1
+orabug: version=0, pmc=0, fixed=0
+orabug: pmu_cap=1
+orabug: version=0, pmc=0, fixed=0
+orabug: pmu_cap=1
+orabug: version=0, pmc=0, fixed=0
+orabug: pmu_cap=1
+orabug: version=0, pmc=0, fixed=0
+
+[    0.239602] Performance Events: PMU not available due to virtualization, using software events only.
+[    0.242680] NMI watchdog: Perf NMI watchdog permanently disabled
+
+[root@vm ~]# cpuid -1 -l 0x80000022
+CPU:
+   Extended Performance Monitoring and Debugging (0x80000022):
+      AMD performance monitoring V2         = false
+      AMD LBR V2                            = false
+      AMD LBR stack & PMC freezing          = false
+      number of core perf ctrs              = 0x0 (0)
+      number of LBR stack entries           = 0x0 (0)
+      number of avail Northbridge perf ctrs = 0x0 (0)
+      number of available UMC PMCs          = 0x0 (0)
+      active UMCs bitmask                   = 0x0
+
+------------
+
+AMD, 6.13 (enable_pmu=N), host.
+
+orabug: /sys/module/kvm/parameters/enable_pmu is N
+qemu-system-x86_64: Failed to enable PMU since KVM's enable_pmu parameter is disabled
+
+------------
+
+AMD, 6.13 (enable_pmu=N), host,-pmu.
+
+orabug: /sys/module/kvm/parameters/enable_pmu is N
+orabug: pmu_cap=0
+orabug: version=0, pmc=0, fixed=0
+orabug: pmu_cap=0
+orabug: version=0, pmc=0, fixed=0
+orabug: pmu_cap=0
+orabug: version=0, pmc=0, fixed=0
+orabug: pmu_cap=0
+orabug: version=0, pmc=0, fixed=0
+
+[    0.252782] Performance Events: PMU not available due to virtualization, using software events only.
+[    0.255882] NMI watchdog: Perf NMI watchdog permanently disabled
+
+[root@vm ~]# cpuid -1 -l 0x80000022
+CPU:
+   Extended Performance Monitoring and Debugging (0x80000022):
+      AMD performance monitoring V2         = false
+      AMD LBR V2                            = false
+      AMD LBR stack & PMC freezing          = false
+      number of core perf ctrs              = 0x0 (0)
+      number of LBR stack entries           = 0x0 (0)
+      number of avail Northbridge perf ctrs = 0x0 (0)
+      number of available UMC PMCs          = 0x0 (0)
+      active UMCs bitmask                   = 0x0
+
+------------
+
+AMD, 6.13 (enable_pmu=N), Skylake-Server.
+
+orabug: /sys/module/kvm/parameters/enable_pmu is N
+orabug: pmu_cap=0
+orabug: version=0, pmc=0, fixed=0
+orabug: pmu_cap=0
+orabug: version=0, pmc=0, fixed=0
+orabug: pmu_cap=0
+orabug: version=0, pmc=0, fixed=0
+orabug: pmu_cap=0
+orabug: version=0, pmc=0, fixed=0
+
+[    0.239097] Performance Events: PMU not available due to virtualization, using software events only.
+[    0.242170] NMI watchdog: Perf NMI watchdog permanently disabled
+
+[root@vm ~]# cpuid -1 -l 0x80000022
+CPU:
+   Extended Performance Monitoring and Debugging (0x80000022):
+      AMD performance monitoring V2         = false
+      AMD LBR V2                            = false
+      AMD LBR stack & PMC freezing          = false
+      number of core perf ctrs              = 0x0 (0)
+      number of LBR stack entries           = 0x0 (0)
+      number of avail Northbridge perf ctrs = 0x0 (0)
+      number of available UMC PMCs          = 0x0 (0)
+      active UMCs bitmask                   = 0x0
+
+------------
+
+AMD, 6.13 (enable_pmu=N), Skylake-Server,+pmu.
+
+orabug: /sys/module/kvm/parameters/enable_pmu is N
+qemu-system-x86_64: Failed to enable PMU since KVM's enable_pmu parameter is disabled
+
+------------
+
+AMD, 6.13 (enable_pmu=N), Skylake-Server,-pmu.
+
+orabug: /sys/module/kvm/parameters/enable_pmu is N
+orabug: pmu_cap=0
+orabug: version=0, pmc=0, fixed=0
+orabug: pmu_cap=0
+orabug: version=0, pmc=0, fixed=0
+orabug: pmu_cap=0
+orabug: version=0, pmc=0, fixed=0
+orabug: pmu_cap=0
+orabug: version=0, pmc=0, fixed=0
+
+[    0.239381] Performance Events: PMU not available due to virtualization, using software events only.
+[    0.242467] NMI watchdog: Perf NMI watchdog permanently disabled
+
+[root@vm ~]# cpuid -1 -l 0x80000022
+CPU:
+   Extended Performance Monitoring and Debugging (0x80000022):
+      AMD performance monitoring V2         = false
+      AMD LBR V2                            = false
+      AMD LBR stack & PMC freezing          = false
+      number of core perf ctrs              = 0x0 (0)
+      number of LBR stack entries           = 0x0 (0)
+      number of avail Northbridge perf ctrs = 0x0 (0)
+      number of available UMC PMCs          = 0x0 (0)
+      active UMCs bitmask                   = 0x0
+
+------------

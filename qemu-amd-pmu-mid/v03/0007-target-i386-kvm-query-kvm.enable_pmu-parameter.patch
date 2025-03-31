@@ -1,4 +1,4 @@
-From 4150a86aca0ca887322255e0455c63cb40a03a57 Mon Sep 17 00:00:00 2001
+From 67514cd5f3b35ff784af23ae0a5dfbffc5545388 Mon Sep 17 00:00:00 2001
 From: Dongli Zhang <dongli.zhang@oracle.com>
 Date: Thu, 27 Mar 2025 10:03:03 -0700
 Subject: [PATCH v3 07/10] target/i386/kvm: query kvm.enable_pmu parameter
@@ -17,7 +17,7 @@ module.
 To help determine the scenario, read the kvm.enable_pmu value from the
 sysfs module parameter.
 
-There isn't any requirement to initialize 'has_pmu_version',
+There isn't any requirement to initialize 'pmu_version',
 'num_pmu_gp_counters' or 'num_pmu_fixed_counters', if kvm.enable_pmu=N.
 
 In addition, return error when kvm.enable_pmu=N but the user wants to enable

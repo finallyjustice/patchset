@@ -1,4 +1,4 @@
-From 2726f35862aa237c2c9cb2707f3b3dcf46ab1223 Mon Sep 17 00:00:00 2001
+From 7d4a256abc9bef1873c47ef9732b088562829676 Mon Sep 17 00:00:00 2001
 From: Dongli Zhang <dongli.zhang@oracle.com>
 Date: Wed, 26 Mar 2025 22:35:15 -0700
 Subject: [PATCH v3 06/10] target/i386/kvm: rename architectural PMU variables
@@ -25,6 +25,8 @@ Reviewed-by: Zhao Liu <zhao1.liu@intel.com>
 Changed since v2:
   - Change has_pmu_version to pmu_version.
   - Add Reviewed-by since the change is minor.
+  - As a reminder, there are some contextual change due to PATCH 05,
+    i.e., c->edx vs. edx.
 
  target/i386/kvm/kvm.c | 49 ++++++++++++++++++++++++-------------------
  1 file changed, 28 insertions(+), 21 deletions(-)

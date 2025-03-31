@@ -1,4 +1,4 @@
-From 7324283aee3d855d28eda34bae4279c4395b81e1 Mon Sep 17 00:00:00 2001
+From 82434e0e20412a224bf2c5e7cf2c7b4689520081 Mon Sep 17 00:00:00 2001
 From: Dongli Zhang <dongli.zhang@oracle.com>
 Date: Fri, 28 Feb 2025 15:47:10 -0800
 Subject: [PATCH v3 02/10] target/i386: disable PERFCORE when "-pmu" is
