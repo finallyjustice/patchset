@@ -1,0 +1,78 @@
+[PATCH v3 0/9] vhost-scsi: log write descriptors for live migration (and three bugfix)
+
+The live migration with vhost-scsi has been enabled by QEMU commit
+b3e89c941a85 ("vhost-scsi: Allow user to enable migration"), which
+thoroughly explains the workflow that QEMU collaborates with vhost-scsi on
+the live migration.
+
+Although it logs dirty data for the used ring, it doesn't log any write
+descriptor (VRING_DESC_F_WRITE).
+
+In comparison, vhost-net logs write descriptors via vhost_log_write(). The
+SPDK (vhost-user-scsi backend) also logs write descriptors via
+vhost_log_req_desc().
+
+As a result, there is likely data mismatch between memory and vhost-scsi
+disk during the live migration.
+
+1. Suppose there is high workload and high memory usage. Suppose some
+systemd userspace pages are swapped out to the swap disk.
+
+2. Upon request from systemd, the kernel reads some pages from the swap
+disk to the memory via vhost-scsi.
+
+3. Although those userspace pages' data are updated, they are not marked as
+dirty by vhost-scsi (this is the bug). They are not going to migrate to the
+target host during memory transfer iterations.
+
+4. Suppose systemd doesn't write to those pages any longer. Those pages
+never get the chance to be dirty or migrated any longer.
+
+5. Once the guest VM is resumed on the target host, because of the lack of
+those dirty pages' data, the systemd may run into abnormal status, i.e.,
+there may be systemd segfault.
+
+Log all write descriptors to fix the issue.
+
+In addition, the patchset also fixes three bugs in vhost-scsi.
+
+Changed since v1:
+  - Rebase on top of most recent vhost changes.
+  - Don't allocate log buffer during initialization. Allocate only once for
+    each command. Don't free until not used any longer.
+  - Add bugfix for vhost_scsi_send_status(). 
+Changed since v2:
+  - Document parameters of vhost_log_write().
+  - Use (len == U64_MAX) to indicate whether log all pages, instead of
+    introducing a new parameter.
+  - Merge PATCH 6 and PATCH 7 from v2 as one patch, to Allocate for only
+    once in submission path in runtime. Reclaim int
+    VHOST_SET_FEATURES/VHOST_SCSI_SET_ENDPOINT.
+  - Encapsulate the one-time on-demand per-cmd log buffer alloc/copy in a
+    helper, as suggested by Mike.
+
+Dongli Zhang (vhost-scsi bugfix):
+  vhost-scsi: protect vq->log_used with vq->mutex
+  vhost-scsi: Fix vhost_scsi_send_bad_target()
+  vhost-scsi: Fix vhost_scsi_send_status()
+	
+Dongli Zhang (log descriptor, suggested by Joao Martins):
+  vhost: modify vhost_log_write() for broader users
+  vhost-scsi: adjust vhost_scsi_get_desc() to log vring descriptors
+  vhost-scsi: log I/O queue write descriptors
+  vhost-scsi: log control queue write descriptors
+  vhost-scsi: log event queue write descriptors
+  vhost: add WARNING if log_num is more than limit
+
+ drivers/vhost/scsi.c  | 264 ++++++++++++++++++++++++++++++++++++++++-----
+ drivers/vhost/vhost.c |  46 ++++++--
+ 2 files changed, 273 insertions(+), 37 deletions(-)
+
+
+base-commit: ac34bd6a617c03cad0fbb61f189f7c4dafbbddfb
+branch: remotes/origin/linux-next
+tree: https://git.kernel.org/pub/scm/linux/kernel/git/mst/vhost.git
+
+Thank you very much!
+
+Dongli Zhang

@@ -1,0 +1,69 @@
+------------
+
+AMD, 5.15, host,vendor=GenuineIntel.
+
+------------
+
+AMD, 5.15, host,vendor=GenuineIntel,-pmu.
+
+------------
+
+AMD, 5.15, Skylake-Server,vendor=GenuineIntel.
+
+------------
+
+AMD, 5.15, Skylake-Server,vendor=GenuineIntel,+pmu.
+
+------------
+
+AMD, 5.15, Skylake-Server,vendor=GenuineIntel,-pmu.
+
+------------
+
+AMD, 6.13, host,vendor=GenuineIntel.
+
+------------
+
+AMD, 6.13, host,vendor=GenuineIntel,-pmu.
+
+------------
+
+AMD, 6.13, Skylake-Server,vendor=GenuineIntel.
+
+------------
+
+AMD, 6.13, Skylake-Server,vendor=GenuineIntel,+pmu.
+
+------------
+
+AMD, 6.13, Skylake-Server,vendor=GenuineIntel,-pmu.
+
+------------
+
+AMD, 6.13, host,vendor="CentaurHauls",+pmu
+
+------------
+
+AMD, 6.13, YongFeng,vendor="CentaurHauls",+pmu
+
+------------
+
+AMD, 6.13 (enable_pmu=N), host,vendor=GenuineIntel.
+
+------------
+
+AMD, 6.13 (enable_pmu=N), host,vendor=GenuineIntel,-pmu.
+
+------------
+
+AMD, 6.13 (enable_pmu=N), Skylake-Server,vendor=GenuineIntel.
+
+------------
+
+AMD, 6.13 (enable_pmu=N), Skylake-Server,vendor=GenuineIntel,+pmu.
+
+------------
+
+AMD, 6.13 (enable_pmu=N), Skylake-Server,vendor=GenuineIntel,-pmu.
+
+------------

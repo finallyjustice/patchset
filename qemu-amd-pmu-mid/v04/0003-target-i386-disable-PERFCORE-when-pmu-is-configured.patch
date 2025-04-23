@@ -1,0 +1,47 @@
+From 6ac9a055131e54d9e423b388a21ace997cbf2ded Mon Sep 17 00:00:00 2001
+From: Dongli Zhang <dongli.zhang@oracle.com>
+Date: Fri, 28 Feb 2025 15:47:10 -0800
+Subject: [PATCH v4 03/11] target/i386: disable PERFCORE when "-pmu" is
+ configured
+
+Currently, AMD PMU support isn't determined based on CPUID, that is, the
+"-pmu" option does not fully disable KVM AMD PMU virtualization.
+
+To minimize AMD PMU features, remove PERFCORE when "-pmu" is configured.
+
+To completely disable AMD PMU virtualization will be implemented via
+KVM_CAP_PMU_CAPABILITY in upcoming patches.
+
+As a reminder, neither CPUID_EXT3_PERFCORE nor
+CPUID_8000_0022_EAX_PERFMON_V2 is removed from env->features[] when "-pmu"
+is configured. Developers should query whether they are supported via
+cpu_x86_cpuid() rather than relying on env->features[] in future patches.
+
+Suggested-by: Zhao Liu <zhao1.liu@intel.com>
+Signed-off-by: Dongli Zhang <dongli.zhang@oracle.com>
+Reviewed-by: Zhao Liu <zhao1.liu@intel.com>
+---
+Changed since v2:
+  - No need to check "kvm_enabled() && IS_AMD_CPU(env)".
+
+ target/i386/cpu.c | 4 ++++
+ 1 file changed, 4 insertions(+)
+
+diff --git a/target/i386/cpu.c b/target/i386/cpu.c
+index 2b87331be5..acbd627f7e 100644
+--- a/target/i386/cpu.c
++++ b/target/i386/cpu.c
+@@ -7242,6 +7242,10 @@ void cpu_x86_cpuid(CPUX86State *env, uint32_t index, uint32_t count,
+             !(env->hflags & HF_LMA_MASK)) {
+             *edx &= ~CPUID_EXT2_SYSCALL;
+         }
++
++        if (!cpu->enable_pmu) {
++            *ecx &= ~CPUID_EXT3_PERFCORE;
++        }
+         break;
+     case 0x80000002:
+     case 0x80000003:
+-- 
+2.39.3
+

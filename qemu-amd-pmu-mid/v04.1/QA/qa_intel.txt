@@ -1,0 +1,61 @@
+------------
+
+Intel, 5.15, host.
+
+------------
+
+Intel, 5.15, host,-pmu.
+
+------------
+
+Intel, 5.15, EPYC.
+
+------------
+
+Intel, 5.15, EPYC,+pmu.
+
+------------
+
+Intel, 5.15, EPYC,-pmu.
+
+------------
+
+Intel, 6.13, host.
+
+------------
+
+Intel, 6.13, host,-pmu.
+
+------------
+
+Intel, 6.13, EPYC.
+
+------------
+
+Intel, 6.13, EPYC,+pmu.
+
+------------
+
+Intel, 6.13, EPYC,-pmu.
+
+------------
+
+Intel, 6.13 (enable_pmu=N), host.
+
+------------
+
+Intel, 6.13 (enable_pmu=N), host,-pmu.
+
+------------
+
+Intel, 6.13 (enable_pmu=N), EPYC.
+
+------------
+
+Intel, 6.13 (enable_pmu=N), EPYC,+pmu.
+
+------------
+
+Intel, 6.13 (enable_pmu=N), EPYC,-pmu.
+
+------------

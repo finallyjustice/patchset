@@ -1,0 +1,69 @@
+------------
+
+Intel, 5.15, host,vendor=AuthenticAMD.
+
+------------
+
+Intel, 5.15, host,vendor=AuthenticAMD,-pmu.
+
+------------
+
+Intel, 5.15, EPYC,vendor=AuthenticAMD.
+
+------------
+
+Intel, 5.15, EPYC,vendor=AuthenticAMD,+pmu.
+
+------------
+
+Intel, 5.15, EPYC,vendor=AuthenticAMD,-pmu.
+
+------------
+
+Intel, 6.13, host,vendor=AuthenticAMD.
+
+------------
+
+Intel, 6.13, host,vendor=AuthenticAMD,-pmu.
+
+------------
+
+Intel, 6.13, EPYC,vendor=AuthenticAMD.
+
+------------
+
+Intel, 6.13, EPYC,vendor=AuthenticAMD,+pmu.
+
+------------
+
+Intel, 6.13, EPYC,vendor=AuthenticAMD,-pmu.
+
+------------
+
+Intel, 6.13, host,vendor="CentaurHauls",+pmu
+
+------------
+
+Intel, 6.13, YongFeng,vendor="CentaurHauls",+pmu
+
+------------
+
+Intel, 6.13 (enable_pmu=N), host,vendor=AuthenticAMD.
+
+------------
+
+Intel, 6.13 (enable_pmu=N), host,vendor=AuthenticAMD,-pmu.
+
+------------
+
+Intel, 6.13 (enable_pmu=N), EPYC,vendor=AuthenticAMD.
+
+------------
+
+Intel, 6.13 (enable_pmu=N), EPYC,vendor=AuthenticAMD,+pmu.
+
+------------
+
+Intel, 6.13 (enable_pmu=N), EPYC,vendor=AuthenticAMD,-pmu.
+
+------------

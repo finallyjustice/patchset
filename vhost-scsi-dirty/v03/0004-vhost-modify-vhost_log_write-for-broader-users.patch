@@ -1,0 +1,78 @@
+From 49bb45e0b27f0420ce203ae8dc59f47a18b72d92 Mon Sep 17 00:00:00 2001
+From: Dongli Zhang <dongli.zhang@oracle.com>
+Date: Tue, 1 Apr 2025 14:24:41 -0700
+Subject: [PATCH v3 4/9] vhost: modify vhost_log_write() for broader users
+
+Currently, the only user of vhost_log_write() is vhost-net. The 'len'
+argument prevents logging of pages that are not tainted by the RX path.
+
+Adjustments are needed since more drivers (i.e. vhost-scsi) begin using
+vhost_log_write(). So far vhost-net RX path may only partially use pages
+shared via the last vring descriptor. Unlike vhost-net, vhost-scsi always
+logs all pages shared via vring descriptors. To accommodate this,
+use (len == U64_MAX) to indicate whether the driver would log all pages of
+vring descriptors, or only pages that are tainted by the driver.
+
+In addition, removes BUG().
+
+Suggested-by: Joao Martins <joao.m.martins@oracle.com>
+Signed-off-by: Dongli Zhang <dongli.zhang@oracle.com>
+---
+Changed since v2:
+  - Document parameters of vhost_log_write().
+  - Use (len == U64_MAX) to indicate whether log all pages, instead of
+    introducing a new parameter.
+
+ drivers/vhost/vhost.c | 28 ++++++++++++++++++++--------
+ 1 file changed, 20 insertions(+), 8 deletions(-)
+
+diff --git a/drivers/vhost/vhost.c b/drivers/vhost/vhost.c
+index 9ac25d08f473..494b3da5423a 100644
+--- a/drivers/vhost/vhost.c
++++ b/drivers/vhost/vhost.c
+@@ -2304,6 +2304,19 @@ static int log_used(struct vhost_virtqueue *vq, u64 used_offset, u64 len)
+ 	return 0;
+ }
+ 
++/*
++ * vhost_log_write() - Log in dirty page bitmap
++ * @vq:      vhost virtqueue.
++ * @log:     Array of dirty memory in GPA.
++ * @log_num: Size of vhost_log arrary.
++ * @len:     The total length of memory buffer to log in the dirty bitmap.
++ *	     Some drivers may only partially use pages shared via the last
++ *	     vring descriptor (i.e. vhost-net RX buffer).
++ *	     Use (len == U64_MAX) to indicate the driver would log all
++ *           pages of vring descriptors.
++ * @iov:     Array of dirty memory in HVA.
++ * @count:   Size of iovec array.
++ */
+ int vhost_log_write(struct vhost_virtqueue *vq, struct vhost_log *log,
+ 		    unsigned int log_num, u64 len, struct iovec *iov, int count)
+ {
+@@ -2327,15 +2340,14 @@ int vhost_log_write(struct vhost_virtqueue *vq, struct vhost_log *log,
+ 		r = log_write(vq->log_base, log[i].addr, l);
+ 		if (r < 0)
+ 			return r;
+-		len -= l;
+-		if (!len) {
+-			if (vq->log_ctx)
+-				eventfd_signal(vq->log_ctx);
+-			return 0;
+-		}
++
++		if (len != U64_MAX)
++			len -= l;
+ 	}
+-	/* Length written exceeds what we have stored. This is a bug. */
+-	BUG();
++
++	if (vq->log_ctx)
++		eventfd_signal(vq->log_ctx);
++
+ 	return 0;
+ }
+ EXPORT_SYMBOL_GPL(vhost_log_write);
+-- 
+2.39.3
+
