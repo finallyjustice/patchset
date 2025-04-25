@@ -1,0 +1,123 @@
+[PATCH v5 00/10] target/i386/kvm/pmu: PMU Enhancement, Bugfix and Cleanup
+
+This patchset addresses four bugs related to AMD PMU virtualization.
+
+1. The PerfMonV2 is still available if PERCORE if disabled via
+"-cpu host,-perfctr-core".
+
+2. The VM 'cpuid' command still returns PERFCORE although "-pmu" is
+configured.
+
+3. The third issue is that using "-cpu host,-pmu" does not disable AMD PMU
+virtualization. When using "-cpu EPYC" or "-cpu host,-pmu", AMD PMU
+virtualization remains enabled. On the VM's Linux side, you might still
+see:
+
+[    0.510611] Performance Events: Fam17h+ core perfctr, AMD PMU driver.
+
+instead of:
+
+[    0.596381] Performance Events: PMU not available due to virtualization, using software events only.
+[    0.600972] NMI watchdog: Perf NMI watchdog permanently disabled
+
+To address this, KVM_CAP_PMU_CAPABILITY is used to set KVM_PMU_CAP_DISABLE
+when "-pmu" is configured.
+
+4. The fourth issue is that unreclaimed performance events (after a QEMU
+system_reset) in KVM may cause random, unwanted, or unknown NMIs to be
+injected into the VM.
+
+The AMD PMU registers are not reset during QEMU system_reset.
+
+(1) If the VM is reset (e.g., via QEMU system_reset or VM kdump/kexec) while
+running "perf top", the PMU registers are not disabled properly.
+
+(2) Despite x86_cpu_reset() resetting many registers to zero, kvm_put_msrs()
+does not handle AMD PMU registers, causing some PMU events to remain
+enabled in KVM.
+
+(3) The KVM kvm_pmc_speculative_in_use() function consistently returns true,
+preventing the reclamation of these events. Consequently, the
+kvm_pmc->perf_event remains active.
+
+(4) After a reboot, the VM kernel may report the following error:
+
+[    0.092011] Performance Events: Fam17h+ core perfctr, Broken BIOS detected, complain to your hardware vendor.
+[    0.092023] [Firmware Bug]: the BIOS has corrupted hw-PMU resources (MSR c0010200 is 530076)
+
+(5) In the worst case, the active kvm_pmc->perf_event may inject unknown
+NMIs randomly into the VM kernel:
+
+[...] Uhhuh. NMI received for unknown reason 30 on CPU 0.
+
+To resolve these issues, we propose resetting AMD PMU registers during the
+VM reset process
+
+
+Changed since v1:
+  - Use feature_dependencies for CPUID_EXT3_PERFCORE and
+    CPUID_8000_0022_EAX_PERFMON_V2.
+  - Remove CPUID_EXT3_PERFCORE when !cpu->enable_pmu.
+  - Pick kvm_arch_pre_create_vcpu() patch from Xiaoyao Li.
+  - Use "-pmu" but not a global "pmu-cap-disabled" for KVM_PMU_CAP_DISABLE.
+  - Also use sysfs kvm.enable_pmu=N to determine if PMU is supported.
+  - Some changes to PMU register limit calculation.
+Changed since v2:
+  - Change has_pmu_cap to pmu_cap.
+  - Use cpuid_find_entry() instead of cpu_x86_cpuid().
+  - Rework the code flow of PATCH 07 related to kvm.enable_pmu=N following
+    Zhao's suggestion.
+  - Use object_property_get_int() to get CPU family.
+  - Add support to Zhaoxin.
+Changed since v3:
+  - Re-base on top of Zhao's queued patch.
+  - Use host_cpu_vendor_fms() from Zhao's patch.
+  - Pick new version of kvm_arch_pre_create_vcpu() patch from Xiaoyao.
+  - Re-split the cases into enable_pmu and !enable_pmu, following Zhao's
+    suggestion.
+  - Check AMD directly makes the "compat" rule clear.
+  - Some changes on commit message and comment.
+  - Bring back global static variable 'kvm_pmu_disabled' read from
+    /sys/module/kvm/parameters/enable_pmu.
+Changed since v4:
+  - Re-base on top of most recent mainline QEMU.
+  - Add more Reviewed-by.
+  - All patches are reviewed.
+
+
+Xiaoyao Li (1):
+  kvm: Introduce kvm_arch_pre_create_vcpu()
+
+Dongli Zhang (9):
+  target/i386: disable PerfMonV2 when PERFCORE unavailable
+  target/i386: disable PERFCORE when "-pmu" is configured
+  target/i386/kvm: set KVM_PMU_CAP_DISABLE if "-pmu" is configured
+  target/i386/kvm: extract unrelated code out of kvm_x86_build_cpuid()
+  target/i386/kvm: rename architectural PMU variables
+  target/i386/kvm: query kvm.enable_pmu parameter
+  target/i386/kvm: reset AMD PMU registers during VM reset
+  target/i386/kvm: support perfmon-v2 for reset
+  target/i386/kvm: don't stop Intel PMU counters
+
+ accel/kvm/kvm-all.c        |   5 +
+ include/system/kvm.h       |   1 +
+ target/arm/kvm.c           |   5 +
+ target/i386/cpu.c          |   8 +
+ target/i386/cpu.h          |  16 ++
+ target/i386/kvm/kvm.c      | 360 ++++++++++++++++++++++++++++++++++------
+ target/loongarch/kvm/kvm.c |   4 +
+ target/mips/kvm.c          |   5 +
+ target/ppc/kvm.c           |   5 +
+ target/riscv/kvm/kvm-cpu.c |   5 +
+ target/s390x/kvm/kvm.c     |   5 +
+ 11 files changed, 372 insertions(+), 47 deletions(-)
+
+base-commit: 019fbfa4bcd2d3a835c241295e22ab2b5b56129b
+
+Thank you very much!
+
+Dongli Zhang
+
+===========
+
+git send-email --to "qemu-devel@nongnu.org" --to "kvm@vger.kernel.org" --to "qemu-arm@nongnu.org" --to "qemu-ppc@nongnu.org" --to "qemu-riscv@nongnu.org" --to "qemu-s390x@nongnu.org" --cc "pbonzini@redhat.com" --cc "zhao1.liu@intel.com" --cc "mtosatti@redhat.com" --cc "sandipan.das@amd.com" --cc "babu.moger@amd.com" --cc "likexu@tencent.com" --cc "like.xu.linux@gmail.com" --cc "groug@kaod.org" --cc "khorenko@virtuozzo.com" --cc "alexander.ivanov@virtuozzo.com" --cc "den@virtuozzo.com" --cc "davydov-max@yandex-team.ru" --cc "xiaoyao.li@intel.com" --cc "dapeng1.mi@linux.intel.com" --cc "joe.jin@oracle.com" --cc "peter.maydell@linaro.org" --cc "gaosong@loongson.cn" --cc "chenhuacai@kernel.org" --cc "philmd@linaro.org" --cc "aurelien@aurel32.net" --cc "jiaxun.yang@flygoat.com" --cc "arikalo@gmail.com"  --cc "npiggin@gmail.com" --cc "danielhb413@gmail.com" --cc "palmer@dabbelt.com" --cc "alistair.francis@wdc.com" --cc "liwei1518@gmail.com" --cc "zhiwei_liu@linux.alibaba.com" --cc "pasic@linux.ibm.com" --cc "borntraeger@linux.ibm.com" --cc "richard.henderson@linaro.org" --cc "david@redhat.com" --cc "iii@linux.ibm.com" --cc "thuth@redhat.com" --cc "flavra@baylibre.com" --cc "ewanhai-oc@zhaoxin.com" --cc "ewanhai@zhaoxin.com" --cc "cobechen@zhaoxin.com" --cc "louisqi@zhaoxin.com" --cc "liamni@zhaoxin.com" --cc "frankzhu@zhaoxin.com" --cc "silviazhao@zhaoxin.com" --cc "kraxel@redhat.com" --cc "berrange@redhat.com"

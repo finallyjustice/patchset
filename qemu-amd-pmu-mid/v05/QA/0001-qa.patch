@@ -1,0 +1,97 @@
+diff --git a/target/i386/kvm/kvm.c b/target/i386/kvm/kvm.c
+index 6396f65558..149b7ffb9c 100644
+--- a/target/i386/kvm/kvm.c
++++ b/target/i386/kvm/kvm.c
+@@ -2046,11 +2046,13 @@ int kvm_arch_pre_create_vcpu(CPUState *cpu, Error **errp)
+         first = false;
+ 
+         if (X86_CPU(cpu)->enable_pmu) {
++            printf("pmu is enabled\n");
+             if (kvm_pmu_disabled) {
+                 warn_report("Failed to enable PMU since "
+                             "KVM's enable_pmu parameter is disabled");
+             }
+         } else {
++            printf("pmu is disabled\n");
+             /*
+              * Since Linux v5.18, KVM provides a VM-level capability to easily
+              * disable PMUs; however, QEMU has been providing PMU property per
+@@ -2156,6 +2158,8 @@ static bool is_host_compat_vendor(CPUX86State *env)
+ 
+     host_cpu_vendor_fms(host_vendor, NULL, NULL, NULL);
+ 
++    printf("host_vendor=%s\n", host_vendor);
++
+     /*
+      * Intel and Zhaoxin are compatible.
+      */
+@@ -2163,6 +2167,7 @@ static bool is_host_compat_vendor(CPUX86State *env)
+          g_str_equal(host_vendor, CPUID_VENDOR_ZHAOXIN1) ||
+          g_str_equal(host_vendor, CPUID_VENDOR_ZHAOXIN2)) &&
+         (IS_INTEL_CPU(env) || IS_ZHAOXIN_CPU(env))) {
++        printf("vendor compatible!\n");
+         return true;
+     }
+ 
+@@ -2178,6 +2183,7 @@ static void kvm_init_pmu_info(struct kvm_cpuid2 *cpuid, X86CPU *cpu)
+      * The PMU virtualization is disabled by kvm.enable_pmu=N.
+      */
+     if (kvm_pmu_disabled) {
++        printf("PMU is disabled by module\n");
+         return;
+     }
+ 
+@@ -2392,6 +2398,8 @@ int kvm_arch_init_vcpu(CPUState *cs)
+     cpuid_data.cpuid.nent = cpuid_i;
+ 
+     kvm_init_pmu_info(&cpuid_data.cpuid, cpu);
++    printf("pmu_cap=%d, kvm_pmu_disabled=%d\n", pmu_cap, kvm_pmu_disabled);
++    printf("version=%u, pmc=%u, fixed=%u\n", pmu_version, num_pmu_gp_counters, num_pmu_fixed_counters);
+ 
+     if (((env->cpuid_version >> 8)&0xF) >= 6
+         && (env->features[FEAT_1_EDX] & (CPUID_MCE | CPUID_MCA)) ==
+@@ -3519,6 +3527,7 @@ int kvm_arch_init(MachineState *ms, KVMState *s)
+      */
+     if (g_file_get_contents("/sys/module/kvm/parameters/enable_pmu",
+                             &kvm_enable_pmu, NULL, NULL)) {
++        printf("/sys/module/kvm/parameters/enable_pmu is %c\n", *kvm_enable_pmu);
+         if (*kvm_enable_pmu == 'N') {
+             kvm_pmu_disabled = true;
+         }
+@@ -4172,6 +4181,7 @@ static int kvm_put_msrs(X86CPU *cpu, int level)
+         }
+ 
+         if ((IS_INTEL_CPU(env) || IS_ZHAOXIN_CPU(env)) && pmu_version > 0) {
++            printf("kvm_put_msrs() reset Intel or Zhaoxin\n");
+             for (i = 0; i < num_pmu_fixed_counters; i++) {
+                 kvm_msr_entry_add(cpu, MSR_CORE_PERF_FIXED_CTR0 + i,
+                                   env->msr_fixed_counters[i]);
+@@ -4204,6 +4214,8 @@ static int kvm_put_msrs(X86CPU *cpu, int level)
+              */
+             uint32_t step = 1;
+ 
++            printf("kvm_put_msrs() reset AMD\n");
++
+             /*
+              * When PERFCORE or PerfMonV2 is enabled, AMD PMU uses a
+              * separate set of addresses for the selector and counter
+@@ -4684,6 +4696,7 @@ static int kvm_get_msrs(X86CPU *cpu)
+     }
+ 
+     if ((IS_INTEL_CPU(env) || IS_ZHAOXIN_CPU(env)) && pmu_version > 0) {
++        printf("kvm_get_msrs() reset Intel or Zhaoxin\n");
+         if (pmu_version > 1) {
+             kvm_msr_entry_add(cpu, MSR_CORE_PERF_FIXED_CTR_CTRL, 0);
+             kvm_msr_entry_add(cpu, MSR_CORE_PERF_GLOBAL_CTRL, 0);
+@@ -4709,6 +4722,8 @@ static int kvm_get_msrs(X86CPU *cpu)
+          */
+         uint32_t step = 1;
+ 
++        printf("kvm_get_msrs() reset AMD\n");
++
+         /*
+          * When PERFCORE or PerfMonV2 is enabled, AMD PMU uses a separate
+          * set of addresses for the selector and counter registers.
+-- 
+2.43.5
+
