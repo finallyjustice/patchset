@@ -1,0 +1,118 @@
+From 6eb09359cfaeea0ea4e415669e155c35fe96045e Mon Sep 17 00:00:00 2001
+From: Dongli Zhang <dongli.zhang@oracle.com>
+Date: Wed, 26 Mar 2025 21:59:13 -0700
+Subject: [PATCH v6 4/9] target/i386/kvm: extract unrelated code out of
+ kvm_x86_build_cpuid()
+
+The initialization of 'has_architectural_pmu_version',
+'num_architectural_pmu_gp_counters', and
+'num_architectural_pmu_fixed_counters' is unrelated to the process of
+building the CPUID.
+
+Extract them out of kvm_x86_build_cpuid().
+
+In addition, use cpuid_find_entry() instead of cpu_x86_cpuid(), because
+CPUID has already been filled at this stage.
+
+Signed-off-by: Dongli Zhang <dongli.zhang@oracle.com>
+Reviewed-by: Zhao Liu <zhao1.liu@intel.com>
+---
+Changed since v1:
+  - Still extract the code, but call them for all CPUs.
+Changed since v2:
+  - Use cpuid_find_entry() instead of cpu_x86_cpuid().
+  - Didn't add Reviewed-by from Dapeng as the change isn't minor.
+
+ target/i386/kvm/kvm.c | 62 ++++++++++++++++++++++++-------------------
+ 1 file changed, 35 insertions(+), 27 deletions(-)
+
+diff --git a/target/i386/kvm/kvm.c b/target/i386/kvm/kvm.c
+index 15155b79b5..4baaa069b8 100644
+--- a/target/i386/kvm/kvm.c
++++ b/target/i386/kvm/kvm.c
+@@ -1968,33 +1968,6 @@ uint32_t kvm_x86_build_cpuid(CPUX86State *env, struct kvm_cpuid_entry2 *entries,
+         }
+     }
+ 
+-    if (limit >= 0x0a) {
+-        uint32_t eax, edx;
+-
+-        cpu_x86_cpuid(env, 0x0a, 0, &eax, &unused, &unused, &edx);
+-
+-        has_architectural_pmu_version = eax & 0xff;
+-        if (has_architectural_pmu_version > 0) {
+-            num_architectural_pmu_gp_counters = (eax & 0xff00) >> 8;
+-
+-            /* Shouldn't be more than 32, since that's the number of bits
+-             * available in EBX to tell us _which_ counters are available.
+-             * Play it safe.
+-             */
+-            if (num_architectural_pmu_gp_counters > MAX_GP_COUNTERS) {
+-                num_architectural_pmu_gp_counters = MAX_GP_COUNTERS;
+-            }
+-
+-            if (has_architectural_pmu_version > 1) {
+-                num_architectural_pmu_fixed_counters = edx & 0x1f;
+-
+-                if (num_architectural_pmu_fixed_counters > MAX_FIXED_COUNTERS) {
+-                    num_architectural_pmu_fixed_counters = MAX_FIXED_COUNTERS;
+-                }
+-            }
+-        }
+-    }
+-
+     cpu_x86_cpuid(env, 0x80000000, 0, &limit, &unused, &unused, &unused);
+ 
+     for (i = 0x80000000; i <= limit; i++) {
+@@ -2098,6 +2071,39 @@ int kvm_arch_pre_create_vcpu(CPUState *cpu, Error **errp)
+     return 0;
+ }
+ 
++static void kvm_init_pmu_info(struct kvm_cpuid2 *cpuid)
++{
++    struct kvm_cpuid_entry2 *c;
++
++    c = cpuid_find_entry(cpuid, 0xa, 0);
++
++    if (!c) {
++        return;
++    }
++
++    has_architectural_pmu_version = c->eax & 0xff;
++    if (has_architectural_pmu_version > 0) {
++        num_architectural_pmu_gp_counters = (c->eax & 0xff00) >> 8;
++
++        /*
++         * Shouldn't be more than 32, since that's the number of bits
++         * available in EBX to tell us _which_ counters are available.
++         * Play it safe.
++         */
++        if (num_architectural_pmu_gp_counters > MAX_GP_COUNTERS) {
++            num_architectural_pmu_gp_counters = MAX_GP_COUNTERS;
++        }
++
++        if (has_architectural_pmu_version > 1) {
++            num_architectural_pmu_fixed_counters = c->edx & 0x1f;
++
++            if (num_architectural_pmu_fixed_counters > MAX_FIXED_COUNTERS) {
++                num_architectural_pmu_fixed_counters = MAX_FIXED_COUNTERS;
++            }
++        }
++    }
++}
++
+ int kvm_arch_init_vcpu(CPUState *cs)
+ {
+     struct {
+@@ -2288,6 +2294,8 @@ int kvm_arch_init_vcpu(CPUState *cs)
+     cpuid_i = kvm_x86_build_cpuid(env, cpuid_data.entries, cpuid_i);
+     cpuid_data.cpuid.nent = cpuid_i;
+ 
++    kvm_init_pmu_info(&cpuid_data.cpuid);
++
+     if (((env->cpuid_version >> 8)&0xF) >= 6
+         && (env->features[FEAT_1_EDX] & (CPUID_MCE | CPUID_MCA)) ==
+            (CPUID_MCE | CPUID_MCA)) {
+-- 
+2.43.5
+

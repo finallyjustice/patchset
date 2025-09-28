@@ -1,0 +1,580 @@
+------------
+
+Intel, 5.15, host.
+
+pmu is enabled
+host_vendor=GenuineIntel
+vendor compatible!
+pmu_cap=0, kvm_pmu_disabled=0
+version=2, pmc=8, fixed=3
+host_vendor=GenuineIntel
+vendor compatible!
+pmu_cap=0, kvm_pmu_disabled=0
+version=2, pmc=8, fixed=3
+host_vendor=GenuineIntel
+vendor compatible!
+pmu_cap=0, kvm_pmu_disabled=0
+version=2, pmc=8, fixed=3
+host_vendor=GenuineIntel
+vendor compatible!
+pmu_cap=0, kvm_pmu_disabled=0
+version=2, pmc=8, fixed=3
+kvm_put_msrs() reset Intel or Zhaoxin
+kvm_put_msrs() reset Intel or Zhaoxin
+kvm_put_msrs() reset Intel or Zhaoxin
+kvm_put_msrs() reset Intel or Zhaoxin
+kvm_get_msrs() reset Intel or Zhaoxin
+kvm_get_msrs() reset Intel or Zhaoxin
+kvm_get_msrs() reset Intel or Zhaoxin
+kvm_get_msrs() reset Intel or Zhaoxin
+kvm_put_msrs() reset Intel or Zhaoxin
+kvm_put_msrs() reset Intel or Zhaoxin
+kvm_put_msrs() reset Intel or Zhaoxin
+kvm_put_msrs() reset Intel or Zhaoxin
+kvm_get_msrs() reset Intel or Zhaoxin
+
+[root@vm ~]# dmesg | grep Perf
+[    0.221109] Performance Events: Icelake events, full-width counters, Intel PMU driver.
+
+[root@vm ~]# cpuid -1 -l 0xa
+CPU:
+   Architecture Performance Monitoring Features (0xa):
+      version ID                               = 0x2 (2)
+      number of counters per logical processor = 0x8 (8)
+      bit width of counter                     = 0x30 (48)
+      length of EBX bit vector                 = 0x8 (8)
+      core cycle event                         = available
+      instruction retired event                = available
+      reference cycles event                   = available
+      last-level cache ref event               = available
+      last-level cache miss event              = available
+      branch inst retired event                = available
+      branch mispred retired event             = available
+      top-down slots event                     = available
+	... ...
+      number of contiguous fixed counters      = 0x3 (3)
+      bit width of fixed counters              = 0x30 (48)
+      anythread deprecation                    = true
+
+------------
+
+Intel, 5.15, host,-pmu.
+
+pmu is disabled
+pmu_cap=0, kvm_pmu_disabled=0
+version=0, pmc=0, fixed=0
+pmu_cap=0, kvm_pmu_disabled=0
+version=0, pmc=0, fixed=0
+pmu_cap=0, kvm_pmu_disabled=0
+version=0, pmc=0, fixed=0
+pmu_cap=0, kvm_pmu_disabled=0
+version=0, pmc=0, fixed=0
+
+[root@vm ~]# dmesg | grep Perf
+[    0.217300] Performance Events: unsupported p6 CPU model 106 no PMU driver, software events only.
+[    0.219522] NMI watchdog: Perf NMI watchdog permanently disabled
+
+[root@vm ~]# cpuid -1 -l 0xa
+CPU:
+   Architecture Performance Monitoring Features (0xa):
+      version ID                               = 0x0 (0)
+      number of counters per logical processor = 0x0 (0)
+      bit width of counter                     = 0x0 (0)
+      length of EBX bit vector                 = 0x0 (0)
+      core cycle event                         = not available
+      instruction retired event                = not available
+      reference cycles event                   = not available
+      last-level cache ref event               = not available
+      last-level cache miss event              = not available
+      branch inst retired event                = not available
+      branch mispred retired event             = not available
+      top-down slots event                     = not available
+... ...
+      number of contiguous fixed counters      = 0x0 (0)
+      bit width of fixed counters              = 0x0 (0)
+      anythread deprecation                    = false
+
+------------
+
+Intel, 5.15, EPYC.
+
+pmu is disabled
+pmu_cap=0, kvm_pmu_disabled=0
+version=0, pmc=0, fixed=0
+pmu_cap=0, kvm_pmu_disabled=0
+version=0, pmc=0, fixed=0
+pmu_cap=0, kvm_pmu_disabled=0
+version=0, pmc=0, fixed=0
+pmu_cap=0, kvm_pmu_disabled=0
+version=0, pmc=0, fixed=0
+
+[root@vm ~]# dmesg | grep Perf
+[    0.335446] Performance Events: no PMU driver, software events only.
+[    0.338658] NMI watchdog: Perf NMI watchdog permanently disabled
+
+[root@vm ~]# cpuid -1 -l 0xa
+CPU:
+   Architecture Performance Monitoring Features (0xa):
+      version ID                               = 0x0 (0)
+      number of counters per logical processor = 0x0 (0)
+      bit width of counter                     = 0x0 (0)
+      length of EBX bit vector                 = 0x0 (0)
+      core cycle event                         = not available
+      instruction retired event                = not available
+      reference cycles event                   = not available
+      last-level cache ref event               = not available
+      last-level cache miss event              = not available
+      branch inst retired event                = not available
+      branch mispred retired event             = not available
+      top-down slots event                     = not available
+	... ...
+      number of contiguous fixed counters      = 0x0 (0)
+      bit width of fixed counters              = 0x0 (0)
+      anythread deprecation                    = false
+
+------------
+
+Intel, 5.15, EPYC,+pmu.
+
+pmu is enabled
+host_vendor=GenuineIntel
+vendor compatible!
+pmu_cap=0, kvm_pmu_disabled=0
+version=2, pmc=8, fixed=3
+host_vendor=GenuineIntel
+vendor compatible!
+pmu_cap=0, kvm_pmu_disabled=0
+version=2, pmc=8, fixed=3
+host_vendor=GenuineIntel
+vendor compatible!
+pmu_cap=0, kvm_pmu_disabled=0
+version=2, pmc=8, fixed=3
+host_vendor=GenuineIntel
+vendor compatible!
+pmu_cap=0, kvm_pmu_disabled=0
+version=2, pmc=8, fixed=3
+kvm_put_msrs() reset Intel or Zhaoxin
+kvm_put_msrs() reset Intel or Zhaoxin
+kvm_put_msrs() reset Intel or Zhaoxin
+kvm_put_msrs() reset Intel or Zhaoxin
+kvm_get_msrs() reset Intel or Zhaoxin
+kvm_get_msrs() reset Intel or Zhaoxin
+kvm_get_msrs() reset Intel or Zhaoxin
+kvm_get_msrs() reset Intel or Zhaoxin
+kvm_put_msrs() reset Intel or Zhaoxin
+kvm_put_msrs() reset Intel or Zhaoxin
+kvm_put_msrs() reset Intel or Zhaoxin
+kvm_put_msrs() reset Intel or Zhaoxin
+kvm_get_msrs() reset Intel or Zhaoxin
+
+[root@vm ~]# dmesg | grep Perf
+[    0.331069] Performance Events: generic architected perfmon, Intel PMU driver.
+
+[root@vm ~]# cpuid -1 -l 0xa
+CPU:
+   Architecture Performance Monitoring Features (0xa):
+      version ID                               = 0x2 (2)
+      number of counters per logical processor = 0x8 (8)
+      bit width of counter                     = 0x30 (48)
+      length of EBX bit vector                 = 0x8 (8)
+      core cycle event                         = available
+      instruction retired event                = available
+      reference cycles event                   = available
+      last-level cache ref event               = available
+      last-level cache miss event              = available
+      branch inst retired event                = available
+      branch mispred retired event             = available
+      top-down slots event                     = available
+	... ...
+      number of contiguous fixed counters      = 0x3 (3)
+      bit width of fixed counters              = 0x30 (48)
+      anythread deprecation                    = true
+
+------------
+
+Intel, 5.15, EPYC,-pmu.
+
+pmu is disabled
+pmu_cap=0, kvm_pmu_disabled=0
+version=0, pmc=0, fixed=0
+pmu_cap=0, kvm_pmu_disabled=0
+version=0, pmc=0, fixed=0
+pmu_cap=0, kvm_pmu_disabled=0
+version=0, pmc=0, fixed=0
+pmu_cap=0, kvm_pmu_disabled=0
+version=0, pmc=0, fixed=0
+
+[root@vm ~]# dmesg | grep Perf
+[    0.330505] Performance Events: no PMU driver, software events only.
+[    0.333631] NMI watchdog: Perf NMI watchdog permanently disabled
+
+[root@vm ~]# cpuid -1 -l 0xa
+CPU:
+   Architecture Performance Monitoring Features (0xa):
+      version ID                               = 0x0 (0)
+      number of counters per logical processor = 0x0 (0)
+      bit width of counter                     = 0x0 (0)
+      length of EBX bit vector                 = 0x0 (0)
+      core cycle event                         = not available
+      instruction retired event                = not available
+      reference cycles event                   = not available
+      last-level cache ref event               = not available
+      last-level cache miss event              = not available
+      branch inst retired event                = not available
+      branch mispred retired event             = not available
+      top-down slots event                     = not available
+	... ...
+      number of contiguous fixed counters      = 0x0 (0)
+      bit width of fixed counters              = 0x0 (0)
+      anythread deprecation                    = false
+
+------------
+
+Intel, 6.13, host.
+
+/sys/module/kvm/parameters/enable_pmu is Y
+pmu is enabled
+host_vendor=GenuineIntel
+vendor compatible!
+pmu_cap=1, kvm_pmu_disabled=0
+version=2, pmc=8, fixed=3
+host_vendor=GenuineIntel
+vendor compatible!
+pmu_cap=1, kvm_pmu_disabled=0
+version=2, pmc=8, fixed=3
+host_vendor=GenuineIntel
+vendor compatible!
+pmu_cap=1, kvm_pmu_disabled=0
+version=2, pmc=8, fixed=3
+host_vendor=GenuineIntel
+vendor compatible!
+pmu_cap=1, kvm_pmu_disabled=0
+version=2, pmc=8, fixed=3
+kvm_put_msrs() reset Intel or Zhaoxin
+kvm_put_msrs() reset Intel or Zhaoxin
+kvm_put_msrs() reset Intel or Zhaoxin
+kvm_put_msrs() reset Intel or Zhaoxin
+kvm_get_msrs() reset Intel or Zhaoxin
+kvm_get_msrs() reset Intel or Zhaoxin
+kvm_get_msrs() reset Intel or Zhaoxin
+kvm_get_msrs() reset Intel or Zhaoxin
+kvm_put_msrs() reset Intel or Zhaoxin
+kvm_put_msrs() reset Intel or Zhaoxin
+kvm_put_msrs() reset Intel or Zhaoxin
+kvm_put_msrs() reset Intel or Zhaoxin
+kvm_get_msrs() reset Intel or Zhaoxin
+
+[root@vm ~]# dmesg | grep Perf
+[    0.220017] Performance Events: PEBS fmt0-, Icelake events, full-width counters, Intel PMU driver.
+
+[root@vm ~]# cpuid -1 -l 0xa
+CPU:
+   Architecture Performance Monitoring Features (0xa):
+      version ID                               = 0x2 (2)
+      number of counters per logical processor = 0x8 (8)
+      bit width of counter                     = 0x30 (48)
+      length of EBX bit vector                 = 0x8 (8)
+      core cycle event                         = available
+      instruction retired event                = available
+      reference cycles event                   = available
+      last-level cache ref event               = available
+      last-level cache miss event              = available
+      branch inst retired event                = available
+      branch mispred retired event             = available
+      top-down slots event                     = available
+... ...
+      number of contiguous fixed counters      = 0x3 (3)
+      bit width of fixed counters              = 0x30 (48)
+      anythread deprecation                    = true
+
+------------
+
+Intel, 6.13, host,-pmu.
+
+/sys/module/kvm/parameters/enable_pmu is Y
+pmu is disabled
+pmu_cap=1, kvm_pmu_disabled=0
+version=0, pmc=0, fixed=0
+pmu_cap=1, kvm_pmu_disabled=0
+version=0, pmc=0, fixed=0
+pmu_cap=1, kvm_pmu_disabled=0
+version=0, pmc=0, fixed=0
+pmu_cap=1, kvm_pmu_disabled=0
+version=0, pmc=0, fixed=0
+
+[root@vm ~]# dmesg | grep Perf
+[    0.218367] Performance Events: unsupported p6 CPU model 106 no PMU driver, software events only.
+[    0.220585] NMI watchdog: Perf NMI watchdog permanently disabled
+
+[root@vm ~]# cpuid -1 -l 0xa
+CPU:
+   Architecture Performance Monitoring Features (0xa):
+      version ID                               = 0x0 (0)
+      number of counters per logical processor = 0x0 (0)
+      bit width of counter                     = 0x0 (0)
+      length of EBX bit vector                 = 0x0 (0)
+      core cycle event                         = not available
+      instruction retired event                = not available
+      reference cycles event                   = not available
+      last-level cache ref event               = not available
+      last-level cache miss event              = not available
+      branch inst retired event                = not available
+      branch mispred retired event             = not available
+      top-down slots event                     = not available
+	... ...
+      number of contiguous fixed counters      = 0x0 (0)
+      bit width of fixed counters              = 0x0 (0)
+      anythread deprecation                    = false
+
+------------
+
+Intel, 6.13, EPYC.
+
+/sys/module/kvm/parameters/enable_pmu is Y
+pmu is disabled
+pmu_cap=1, kvm_pmu_disabled=0
+version=0, pmc=0, fixed=0
+pmu_cap=1, kvm_pmu_disabled=0
+version=0, pmc=0, fixed=0
+pmu_cap=1, kvm_pmu_disabled=0
+version=0, pmc=0, fixed=0
+pmu_cap=1, kvm_pmu_disabled=0
+version=0, pmc=0, fixed=0
+
+[root@vm ~]# dmesg | grep Perf
+[    0.310092] Performance Events: no PMU driver, software events only.
+[    0.312304] NMI watchdog: Perf NMI watchdog permanently disabled
+[root@vm ~]# cpuid -1 -l 0xa
+CPU:
+   Architecture Performance Monitoring Features (0xa):
+      version ID                               = 0x0 (0)
+      number of counters per logical processor = 0x0 (0)
+      bit width of counter                     = 0x0 (0)
+      length of EBX bit vector                 = 0x0 (0)
+      core cycle event                         = not available
+      instruction retired event                = not available
+      reference cycles event                   = not available
+      last-level cache ref event               = not available
+      last-level cache miss event              = not available
+      branch inst retired event                = not available
+      branch mispred retired event             = not available
+      top-down slots event                     = not available
+	... ...
+      number of contiguous fixed counters      = 0x0 (0)
+      bit width of fixed counters              = 0x0 (0)
+      anythread deprecation                    = false
+
+------------
+
+Intel, 6.13, EPYC,+pmu.
+
+/sys/module/kvm/parameters/enable_pmu is Y
+pmu is enabled
+host_vendor=GenuineIntel
+vendor compatible!
+pmu_cap=1, kvm_pmu_disabled=0
+version=2, pmc=8, fixed=3
+host_vendor=GenuineIntel
+vendor compatible!
+pmu_cap=1, kvm_pmu_disabled=0
+version=2, pmc=8, fixed=3
+host_vendor=GenuineIntel
+vendor compatible!
+pmu_cap=1, kvm_pmu_disabled=0
+version=2, pmc=8, fixed=3
+host_vendor=GenuineIntel
+vendor compatible!
+pmu_cap=1, kvm_pmu_disabled=0
+version=2, pmc=8, fixed=3
+kvm_put_msrs() reset Intel or Zhaoxin
+kvm_put_msrs() reset Intel or Zhaoxin
+kvm_put_msrs() reset Intel or Zhaoxin
+kvm_put_msrs() reset Intel or Zhaoxin
+kvm_get_msrs() reset Intel or Zhaoxin
+kvm_get_msrs() reset Intel or Zhaoxin
+kvm_get_msrs() reset Intel or Zhaoxin
+kvm_get_msrs() reset Intel or Zhaoxin
+kvm_put_msrs() reset Intel or Zhaoxin
+kvm_put_msrs() reset Intel or Zhaoxin
+kvm_put_msrs() reset Intel or Zhaoxin
+kvm_put_msrs() reset Intel or Zhaoxin
+kvm_get_msrs() reset Intel or Zhaoxin
+
+[root@vm ~]# dmesg | grep Perf
+[    0.306191] Performance Events: generic architected perfmon, Intel PMU driver.
+[root@vm ~]# cpuid -1 -l 0xa
+CPU:
+   Architecture Performance Monitoring Features (0xa):
+      version ID                               = 0x2 (2)
+      number of counters per logical processor = 0x8 (8)
+      bit width of counter                     = 0x30 (48)
+      length of EBX bit vector                 = 0x8 (8)
+      core cycle event                         = available
+      instruction retired event                = available
+      reference cycles event                   = available
+      last-level cache ref event               = available
+      last-level cache miss event              = available
+      branch inst retired event                = available
+      branch mispred retired event             = available
+      top-down slots event                     = available
+	... ...
+      number of contiguous fixed counters      = 0x3 (3)
+      bit width of fixed counters              = 0x30 (48)
+      anythread deprecation                    = true
+
+------------
+
+Intel, 6.13, EPYC,-pmu.
+
+/sys/module/kvm/parameters/enable_pmu is Y
+pmu is disabled
+pmu_cap=1, kvm_pmu_disabled=0
+version=0, pmc=0, fixed=0
+pmu_cap=1, kvm_pmu_disabled=0
+version=0, pmc=0, fixed=0
+pmu_cap=1, kvm_pmu_disabled=0
+version=0, pmc=0, fixed=0
+pmu_cap=1, kvm_pmu_disabled=0
+version=0, pmc=0, fixed=0
+
+[root@vm ~]# dmesg | grep Perf
+[    0.306484] Performance Events: no PMU driver, software events only.
+[    0.308689] NMI watchdog: Perf NMI watchdog permanently disabled
+[root@vm ~]# cpuid -1 -l 0xa
+CPU:
+   Architecture Performance Monitoring Features (0xa):
+      version ID                               = 0x0 (0)
+      number of counters per logical processor = 0x0 (0)
+      bit width of counter                     = 0x0 (0)
+      length of EBX bit vector                 = 0x0 (0)
+      core cycle event                         = not available
+      instruction retired event                = not available
+      reference cycles event                   = not available
+      last-level cache ref event               = not available
+      last-level cache miss event              = not available
+      branch inst retired event                = not available
+      branch mispred retired event             = not available
+      top-down slots event                     = not available
+	... ...
+      number of contiguous fixed counters      = 0x0 (0)
+      bit width of fixed counters              = 0x0 (0)
+      anythread deprecation                    = false
+
+------------
+
+Intel, 6.13 (enable_pmu=N), host.
+
+/sys/module/kvm/parameters/enable_pmu is N
+pmu is enabled
+qemu-system-x86_64: warning: Failed to enable PMU since KVM's enable_pmu parameter is disabled
+PMU is disabled by module
+pmu_cap=0, kvm_pmu_disabled=1
+version=0, pmc=0, fixed=0
+PMU is disabled by module
+pmu_cap=0, kvm_pmu_disabled=1
+version=0, pmc=0, fixed=0
+PMU is disabled by module
+pmu_cap=0, kvm_pmu_disabled=1
+version=0, pmc=0, fixed=0
+PMU is disabled by module
+pmu_cap=0, kvm_pmu_disabled=1
+version=0, pmc=0, fixed=0
+
+[root@vm ~]# dmesg | grep Perf
+[    0.218698] Performance Events: unsupported p6 CPU model 106 no PMU driver, software events only.
+[    0.220909] NMI watchdog: Perf NMI watchdog permanently disabled
+
+------------
+
+Intel, 6.13 (enable_pmu=N), host,-pmu.
+
+/sys/module/kvm/parameters/enable_pmu is N
+pmu is disabled
+PMU is disabled by module
+pmu_cap=0, kvm_pmu_disabled=1
+version=0, pmc=0, fixed=0
+PMU is disabled by module
+pmu_cap=0, kvm_pmu_disabled=1
+version=0, pmc=0, fixed=0
+PMU is disabled by module
+pmu_cap=0, kvm_pmu_disabled=1
+version=0, pmc=0, fixed=0
+PMU is disabled by module
+pmu_cap=0, kvm_pmu_disabled=1
+version=0, pmc=0, fixed=0
+
+[root@vm ~]# dmesg | grep Perf
+[    0.217693] Performance Events: unsupported p6 CPU model 106 no PMU driver, software events only.
+[    0.219910] NMI watchdog: Perf NMI watchdog permanently disabled
+
+------------
+
+Intel, 6.13 (enable_pmu=N), EPYC.
+
+/sys/module/kvm/parameters/enable_pmu is N
+pmu is disabled
+PMU is disabled by module
+pmu_cap=0, kvm_pmu_disabled=1
+version=0, pmc=0, fixed=0
+PMU is disabled by module
+pmu_cap=0, kvm_pmu_disabled=1
+version=0, pmc=0, fixed=0
+PMU is disabled by module
+pmu_cap=0, kvm_pmu_disabled=1
+version=0, pmc=0, fixed=0
+PMU is disabled by module
+pmu_cap=0, kvm_pmu_disabled=1
+version=0, pmc=0, fixed=0
+
+[root@vm ~]# dmesg | grep Perf
+[    0.305232] Performance Events: no PMU driver, software events only.
+[    0.307438] NMI watchdog: Perf NMI watchdog permanently disabled
+
+------------
+
+Intel, 6.13 (enable_pmu=N), EPYC,+pmu.
+
+/sys/module/kvm/parameters/enable_pmu is N
+pmu is enabled
+qemu-system-x86_64: warning: Failed to enable PMU since KVM's enable_pmu parameter is disabled
+PMU is disabled by module
+pmu_cap=0, kvm_pmu_disabled=1
+version=0, pmc=0, fixed=0
+PMU is disabled by module
+pmu_cap=0, kvm_pmu_disabled=1
+version=0, pmc=0, fixed=0
+PMU is disabled by module
+pmu_cap=0, kvm_pmu_disabled=1
+version=0, pmc=0, fixed=0
+PMU is disabled by module
+pmu_cap=0, kvm_pmu_disabled=1
+version=0, pmc=0, fixed=0
+
+[root@vm ~]# dmesg | grep Perf
+[    0.307596] Performance Events: no PMU driver, software events only.
+[    0.309800] NMI watchdog: Perf NMI watchdog permanently disabled
+
+------------
+
+Intel, 6.13 (enable_pmu=N), EPYC,-pmu.
+
+/sys/module/kvm/parameters/enable_pmu is N
+pmu is disabled
+PMU is disabled by module
+pmu_cap=0, kvm_pmu_disabled=1
+version=0, pmc=0, fixed=0
+PMU is disabled by module
+pmu_cap=0, kvm_pmu_disabled=1
+version=0, pmc=0, fixed=0
+PMU is disabled by module
+pmu_cap=0, kvm_pmu_disabled=1
+version=0, pmc=0, fixed=0
+PMU is disabled by module
+pmu_cap=0, kvm_pmu_disabled=1
+version=0, pmc=0, fixed=0
+
+[root@vm ~]# dmesg | grep Perf
+[    0.306070] Performance Events: no PMU driver, software events only.
+[    0.308279] NMI watchdog: Perf NMI watchdog permanently disabled
+
+------------
