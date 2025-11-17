@@ -1,0 +1,544 @@
+------------
+
+AMD, 5.15, host.
+
+pmu is enabled
+host_vendor=AuthenticAMD
+pmu_cap=0, kvm_pmu_disabled=0
+version=1, pmc=6, fixed=0
+host_vendor=AuthenticAMD
+pmu_cap=0, kvm_pmu_disabled=0
+version=1, pmc=6, fixed=0
+host_vendor=AuthenticAMD
+pmu_cap=0, kvm_pmu_disabled=0
+version=1, pmc=6, fixed=0
+host_vendor=AuthenticAMD
+pmu_cap=0, kvm_pmu_disabled=0
+version=1, pmc=6, fixed=0
+kvm_put_msrs() reset AMD
+kvm_put_msrs() reset AMD
+kvm_put_msrs() reset AMD
+kvm_put_msrs() reset AMD
+kvm_get_msrs() reset AMD
+kvm_get_msrs() reset AMD
+kvm_get_msrs() reset AMD
+kvm_get_msrs() reset AMD
+kvm_put_msrs() reset AMD
+kvm_put_msrs() reset AMD
+kvm_put_msrs() reset AMD
+kvm_put_msrs() reset AMD
+kvm_get_msrs() reset AMD
+
+[root@vm ~]# dmesg | grep Perf
+[    0.311381] Performance Events: Fam17h+ core perfctr, AMD PMU driver.
+
+[root@vm ~]# cpuid -1 -l 0x80000022
+CPU:
+   Extended Performance Monitoring and Debugging (0x80000022):
+      AMD performance monitoring V2         = false
+      AMD LBR V2                            = false
+      AMD LBR stack & PMC freezing          = false
+      number of core perf ctrs              = 0x0 (0)
+      number of LBR stack entries           = 0x0 (0)
+      number of avail Northbridge perf ctrs = 0x0 (0)
+      number of available UMC PMCs          = 0x0 (0)
+      active UMCs bitmask                   = 0x0
+
+------------
+
+AMD, 5.15, host,-pmu.
+
+pmu is disabled
+pmu_cap=0, kvm_pmu_disabled=0
+version=0, pmc=0, fixed=0
+pmu_cap=0, kvm_pmu_disabled=0
+version=0, pmc=0, fixed=0
+pmu_cap=0, kvm_pmu_disabled=0
+version=0, pmc=0, fixed=0
+pmu_cap=0, kvm_pmu_disabled=0
+version=0, pmc=0, fixed=0
+
+[root@vm ~]# dmesg | grep Perf
+[    0.324291] Performance Events: AMD PMU driver.
+
+[root@vm ~]# cpuid -1 -l 0x80000022
+CPU:
+   Extended Performance Monitoring and Debugging (0x80000022):
+      AMD performance monitoring V2         = false
+      AMD LBR V2                            = false
+      AMD LBR stack & PMC freezing          = false
+      number of core perf ctrs              = 0x0 (0)
+      number of LBR stack entries           = 0x0 (0)
+      number of avail Northbridge perf ctrs = 0x0 (0)
+      number of available UMC PMCs          = 0x0 (0)
+      active UMCs bitmask                   = 0x0
+
+------------
+
+AMD, 5.15, Skylake-Server.
+
+pmu is disabled
+pmu_cap=0, kvm_pmu_disabled=0
+version=0, pmc=0, fixed=0
+pmu_cap=0, kvm_pmu_disabled=0
+version=0, pmc=0, fixed=0
+pmu_cap=0, kvm_pmu_disabled=0
+version=0, pmc=0, fixed=0
+pmu_cap=0, kvm_pmu_disabled=0
+version=0, pmc=0, fixed=0
+
+[root@vm ~]# dmesg | grep Perf
+[    0.319744] Performance Events: AMD PMU driver.
+
+[root@vm ~]# cpuid -1 -l 0x80000022
+CPU:
+   Extended Performance Monitoring and Debugging (0x80000022):
+      AMD performance monitoring V2         = false
+      AMD LBR V2                            = false
+      AMD LBR stack & PMC freezing          = false
+      number of core perf ctrs              = 0x0 (0)
+      number of LBR stack entries           = 0x0 (0)
+      number of avail Northbridge perf ctrs = 0x0 (0)
+      number of available UMC PMCs          = 0x0 (0)
+      active UMCs bitmask                   = 0x0
+
+------------
+
+AMD, 5.15, Skylake-Server,+pmu.
+
+pmu is enabled
+host_vendor=AuthenticAMD
+pmu_cap=0, kvm_pmu_disabled=0
+version=1, pmc=4, fixed=0
+host_vendor=AuthenticAMD
+pmu_cap=0, kvm_pmu_disabled=0
+version=1, pmc=4, fixed=0
+host_vendor=AuthenticAMD
+pmu_cap=0, kvm_pmu_disabled=0
+version=1, pmc=4, fixed=0
+host_vendor=AuthenticAMD
+pmu_cap=0, kvm_pmu_disabled=0
+version=1, pmc=4, fixed=0
+kvm_put_msrs() reset AMD
+kvm_put_msrs() reset AMD
+kvm_put_msrs() reset AMD
+kvm_put_msrs() reset AMD
+kvm_get_msrs() reset AMD
+kvm_get_msrs() reset AMD
+kvm_get_msrs() reset AMD
+kvm_get_msrs() reset AMD
+kvm_put_msrs() reset AMD
+kvm_put_msrs() reset AMD
+kvm_put_msrs() reset AMD
+kvm_put_msrs() reset AMD
+kvm_get_msrs() reset AMD
+
+[root@vm ~]# dmesg | grep Perf
+[    0.317448] Performance Events: AMD PMU driver.
+
+[root@vm ~]# cpuid -1 -l 0x80000022
+CPU:
+   Extended Performance Monitoring and Debugging (0x80000022):
+      AMD performance monitoring V2         = false
+      AMD LBR V2                            = false
+      AMD LBR stack & PMC freezing          = false
+      number of core perf ctrs              = 0x0 (0)
+      number of LBR stack entries           = 0x0 (0)
+      number of avail Northbridge perf ctrs = 0x0 (0)
+      number of available UMC PMCs          = 0x0 (0)
+      active UMCs bitmask                   = 0x0
+
+------------
+
+AMD, 5.15, Skylake-Server,-pmu.
+
+pmu is disabled
+pmu_cap=0, kvm_pmu_disabled=0
+version=0, pmc=0, fixed=0
+pmu_cap=0, kvm_pmu_disabled=0
+version=0, pmc=0, fixed=0
+pmu_cap=0, kvm_pmu_disabled=0
+version=0, pmc=0, fixed=0
+pmu_cap=0, kvm_pmu_disabled=0
+version=0, pmc=0, fixed=0
+
+[root@vm ~]# dmesg | grep Perf
+[    0.315252] Performance Events: AMD PMU driver.
+
+[root@vm ~]# cpuid -1 -l 0x80000022
+CPU:
+   Extended Performance Monitoring and Debugging (0x80000022):
+      AMD performance monitoring V2         = false
+      AMD LBR V2                            = false
+      AMD LBR stack & PMC freezing          = false
+      number of core perf ctrs              = 0x0 (0)
+      number of LBR stack entries           = 0x0 (0)
+      number of avail Northbridge perf ctrs = 0x0 (0)
+      number of available UMC PMCs          = 0x0 (0)
+      active UMCs bitmask                   = 0x0
+
+------------
+
+AMD, 6.13, host.
+
+/sys/module/kvm/parameters/enable_pmu is Y
+pmu is enabled
+host_vendor=AuthenticAMD
+pmu_cap=1, kvm_pmu_disabled=0
+version=2, pmc=6, fixed=0
+host_vendor=AuthenticAMD
+pmu_cap=1, kvm_pmu_disabled=0
+version=2, pmc=6, fixed=0
+host_vendor=AuthenticAMD
+pmu_cap=1, kvm_pmu_disabled=0
+version=2, pmc=6, fixed=0
+host_vendor=AuthenticAMD
+pmu_cap=1, kvm_pmu_disabled=0
+version=2, pmc=6, fixed=0
+kvm_put_msrs() reset AMD
+kvm_put_msrs() reset AMD
+kvm_put_msrs() reset AMD
+kvm_put_msrs() reset AMD
+kvm_get_msrs() reset AMD
+kvm_get_msrs() reset AMD
+kvm_get_msrs() reset AMD
+kvm_get_msrs() reset AMD
+kvm_put_msrs() reset AMD
+kvm_put_msrs() reset AMD
+kvm_put_msrs() reset AMD
+kvm_put_msrs() reset AMD
+kvm_get_msrs() reset AMD
+
+[root@vm ~]# dmesg | grep Perf
+[    0.345502] Performance Events: Fam17h+ core perfctr, AMD PMU driver.
+
+[root@vm ~]# cpuid -1 -l 0x80000022
+CPU:
+   Extended Performance Monitoring and Debugging (0x80000022):
+      AMD performance monitoring V2         = true
+      AMD LBR V2                            = false
+      AMD LBR stack & PMC freezing          = false
+      number of core perf ctrs              = 0x6 (6)
+      number of LBR stack entries           = 0x0 (0)
+      number of avail Northbridge perf ctrs = 0x0 (0)
+      number of available UMC PMCs          = 0x0 (0)
+      active UMCs bitmask                   = 0x0
+
+------------
+
+AMD, 6.13, host,-pmu.
+
+/sys/module/kvm/parameters/enable_pmu is Y
+pmu is disabled
+pmu_cap=1, kvm_pmu_disabled=0
+version=0, pmc=0, fixed=0
+pmu_cap=1, kvm_pmu_disabled=0
+version=0, pmc=0, fixed=0
+pmu_cap=1, kvm_pmu_disabled=0
+version=0, pmc=0, fixed=0
+pmu_cap=1, kvm_pmu_disabled=0
+version=0, pmc=0, fixed=0
+
+[root@vm ~]# dmesg | grep Perf
+[    0.347453] Performance Events: PMU not available due to virtualization, using software events only.
+[    0.351656] NMI watchdog: Perf NMI watchdog permanently disabled
+
+[root@vm ~]# cpuid -1 -l 0x80000022
+CPU:
+   Extended Performance Monitoring and Debugging (0x80000022):
+      AMD performance monitoring V2         = false
+      AMD LBR V2                            = false
+      AMD LBR stack & PMC freezing          = false
+      number of core perf ctrs              = 0x0 (0)
+      number of LBR stack entries           = 0x0 (0)
+      number of avail Northbridge perf ctrs = 0x0 (0)
+      number of available UMC PMCs          = 0x0 (0)
+      active UMCs bitmask                   = 0x0
+
+------------
+
+AMD, 6.13, Skylake-Server.
+
+/sys/module/kvm/parameters/enable_pmu is Y
+pmu is disabled
+pmu_cap=1, kvm_pmu_disabled=0
+version=0, pmc=0, fixed=0
+pmu_cap=1, kvm_pmu_disabled=0
+version=0, pmc=0, fixed=0
+pmu_cap=1, kvm_pmu_disabled=0
+version=0, pmc=0, fixed=0
+pmu_cap=1, kvm_pmu_disabled=0
+version=0, pmc=0, fixed=0
+
+[root@vm ~]# dmesg | grep Perf
+[    0.343855] Performance Events: PMU not available due to virtualization, using software events only.
+[    0.348050] NMI watchdog: Perf NMI watchdog permanently disabled
+
+[root@vm ~]# cpuid -1 -l 0x80000022
+CPU:
+   Extended Performance Monitoring and Debugging (0x80000022):
+      AMD performance monitoring V2         = false
+      AMD LBR V2                            = false
+      AMD LBR stack & PMC freezing          = false
+      number of core perf ctrs              = 0x0 (0)
+      number of LBR stack entries           = 0x0 (0)
+      number of avail Northbridge perf ctrs = 0x0 (0)
+      number of available UMC PMCs          = 0x0 (0)
+      active UMCs bitmask                   = 0x0
+
+------------
+
+AMD, 6.13, Skylake-Server,+pmu.
+
+/sys/module/kvm/parameters/enable_pmu is Y
+pmu is enabled
+host_vendor=AuthenticAMD
+pmu_cap=1, kvm_pmu_disabled=0
+version=1, pmc=4, fixed=0
+host_vendor=AuthenticAMD
+pmu_cap=1, kvm_pmu_disabled=0
+version=1, pmc=4, fixed=0
+host_vendor=AuthenticAMD
+pmu_cap=1, kvm_pmu_disabled=0
+version=1, pmc=4, fixed=0
+host_vendor=AuthenticAMD
+pmu_cap=1, kvm_pmu_disabled=0
+version=1, pmc=4, fixed=0
+kvm_put_msrs() reset AMD
+kvm_put_msrs() reset AMD
+kvm_put_msrs() reset AMD
+kvm_put_msrs() reset AMD
+kvm_get_msrs() reset AMD
+kvm_get_msrs() reset AMD
+kvm_get_msrs() reset AMD
+kvm_get_msrs() reset AMD
+kvm_put_msrs() reset AMD
+kvm_put_msrs() reset AMD
+kvm_put_msrs() reset AMD
+kvm_put_msrs() reset AMD
+kvm_get_msrs() reset AMD
+
+[root@vm ~]# dmesg | grep Perf
+[    0.340871] Performance Events: AMD PMU driver.
+
+[root@vm ~]# cpuid -1 -l 0x80000022
+CPU:
+   Extended Performance Monitoring and Debugging (0x80000022):
+      AMD performance monitoring V2         = false
+      AMD LBR V2                            = false
+      AMD LBR stack & PMC freezing          = false
+      number of core perf ctrs              = 0x0 (0)
+      number of LBR stack entries           = 0x0 (0)
+      number of avail Northbridge perf ctrs = 0x0 (0)
+      number of available UMC PMCs          = 0x0 (0)
+      active UMCs bitmask                   = 0x0
+
+------------
+
+AMD, 6.13, Skylake-Server,-pmu.
+
+/sys/module/kvm/parameters/enable_pmu is Y
+pmu is disabled
+pmu_cap=1, kvm_pmu_disabled=0
+version=0, pmc=0, fixed=0
+pmu_cap=1, kvm_pmu_disabled=0
+version=0, pmc=0, fixed=0
+pmu_cap=1, kvm_pmu_disabled=0
+version=0, pmc=0, fixed=0
+pmu_cap=1, kvm_pmu_disabled=0
+version=0, pmc=0, fixed=0
+
+[root@vm ~]# dmesg | grep Perf
+[    0.342640] Performance Events: PMU not available due to virtualization, using software events only.
+[    0.346834] NMI watchdog: Perf NMI watchdog permanently disabled
+
+[root@vm ~]# cpuid -1 -l 0x80000022
+CPU:
+   Extended Performance Monitoring and Debugging (0x80000022):
+      AMD performance monitoring V2         = false
+      AMD LBR V2                            = false
+      AMD LBR stack & PMC freezing          = false
+      number of core perf ctrs              = 0x0 (0)
+      number of LBR stack entries           = 0x0 (0)
+      number of avail Northbridge perf ctrs = 0x0 (0)
+      number of available UMC PMCs          = 0x0 (0)
+      active UMCs bitmask                   = 0x0
+
+------------
+
+AMD, 6.13 (enable_pmu=N), host.
+
+/sys/module/kvm/parameters/enable_pmu is N
+pmu is enabled
+qemu-system-x86_64: warning: Failed to enable PMU since KVM's enable_pmu parameter is disabled
+PMU is disabled by module
+pmu_cap=0, kvm_pmu_disabled=1
+version=0, pmc=0, fixed=0
+PMU is disabled by module
+pmu_cap=0, kvm_pmu_disabled=1
+version=0, pmc=0, fixed=0
+PMU is disabled by module
+pmu_cap=0, kvm_pmu_disabled=1
+version=0, pmc=0, fixed=0
+PMU is disabled by module
+pmu_cap=0, kvm_pmu_disabled=1
+version=0, pmc=0, fixed=0
+
+[root@vm ~]# dmesg | grep Perf
+[    0.354992] Performance Events: PMU not available due to virtualization, using software events only.
+[    0.359203] NMI watchdog: Perf NMI watchdog permanently disabled
+
+[root@vm ~]# cpuid -1 -l 0x80000022
+CPU:
+   Extended Performance Monitoring and Debugging (0x80000022):
+      AMD performance monitoring V2         = false
+      AMD LBR V2                            = false
+      AMD LBR stack & PMC freezing          = false
+      number of core perf ctrs              = 0x0 (0)
+      number of LBR stack entries           = 0x0 (0)
+      number of avail Northbridge perf ctrs = 0x0 (0)
+      number of available UMC PMCs          = 0x0 (0)
+      active UMCs bitmask                   = 0x0
+
+------------
+
+AMD, 6.13 (enable_pmu=N), host,-pmu.
+
+/sys/module/kvm/parameters/enable_pmu is N
+pmu is disabled
+PMU is disabled by module
+pmu_cap=0, kvm_pmu_disabled=1
+version=0, pmc=0, fixed=0
+PMU is disabled by module
+pmu_cap=0, kvm_pmu_disabled=1
+version=0, pmc=0, fixed=0
+PMU is disabled by module
+pmu_cap=0, kvm_pmu_disabled=1
+version=0, pmc=0, fixed=0
+PMU is disabled by module
+pmu_cap=0, kvm_pmu_disabled=1
+version=0, pmc=0, fixed=0
+
+[root@vm ~]# dmesg | grep Perf
+[    0.345367] Performance Events: PMU not available due to virtualization, using software events only.
+[    0.349566] NMI watchdog: Perf NMI watchdog permanently disabled
+
+[root@vm ~]# cpuid -1 -l 0x80000022
+CPU:
+   Extended Performance Monitoring and Debugging (0x80000022):
+      AMD performance monitoring V2         = false
+      AMD LBR V2                            = false
+      AMD LBR stack & PMC freezing          = false
+      number of core perf ctrs              = 0x0 (0)
+      number of LBR stack entries           = 0x0 (0)
+      number of avail Northbridge perf ctrs = 0x0 (0)
+      number of available UMC PMCs          = 0x0 (0)
+      active UMCs bitmask                   = 0x0
+
+------------
+
+AMD, 6.13 (enable_pmu=N), Skylake-Server.
+
+/sys/module/kvm/parameters/enable_pmu is N
+pmu is disabled
+PMU is disabled by module
+pmu_cap=0, kvm_pmu_disabled=1
+version=0, pmc=0, fixed=0
+PMU is disabled by module
+pmu_cap=0, kvm_pmu_disabled=1
+version=0, pmc=0, fixed=0
+PMU is disabled by module
+pmu_cap=0, kvm_pmu_disabled=1
+version=0, pmc=0, fixed=0
+PMU is disabled by module
+pmu_cap=0, kvm_pmu_disabled=1
+version=0, pmc=0, fixed=0
+
+[root@vm ~]# dmesg | grep Perf
+[    0.340812] Performance Events: PMU not available due to virtualization, using software events only.
+[    0.345019] NMI watchdog: Perf NMI watchdog permanently disabled
+
+[root@vm ~]# cpuid -1 -l 0x80000022
+CPU:
+   Extended Performance Monitoring and Debugging (0x80000022):
+      AMD performance monitoring V2         = false
+      AMD LBR V2                            = false
+      AMD LBR stack & PMC freezing          = false
+      number of core perf ctrs              = 0x0 (0)
+      number of LBR stack entries           = 0x0 (0)
+      number of avail Northbridge perf ctrs = 0x0 (0)
+      number of available UMC PMCs          = 0x0 (0)
+      active UMCs bitmask                   = 0x0
+
+------------
+
+AMD, 6.13 (enable_pmu=N), Skylake-Server,+pmu.
+
+/sys/module/kvm/parameters/enable_pmu is N
+pmu is enabled
+qemu-system-x86_64: warning: Failed to enable PMU since KVM's enable_pmu parameter is disabled
+PMU is disabled by module
+pmu_cap=0, kvm_pmu_disabled=1
+version=0, pmc=0, fixed=0
+PMU is disabled by module
+pmu_cap=0, kvm_pmu_disabled=1
+version=0, pmc=0, fixed=0
+PMU is disabled by module
+pmu_cap=0, kvm_pmu_disabled=1
+version=0, pmc=0, fixed=0
+PMU is disabled by module
+pmu_cap=0, kvm_pmu_disabled=1
+version=0, pmc=0, fixed=0
+
+[root@vm ~]# dmesg | grep Perf
+[    0.345102] Performance Events: PMU not available due to virtualization, using software events only.
+[    0.349299] NMI watchdog: Perf NMI watchdog permanently disabled
+
+[root@vm ~]# cpuid -1 -l 0x80000022
+CPU:
+   Extended Performance Monitoring and Debugging (0x80000022):
+      AMD performance monitoring V2         = false
+      AMD LBR V2                            = false
+      AMD LBR stack & PMC freezing          = false
+      number of core perf ctrs              = 0x0 (0)
+      number of LBR stack entries           = 0x0 (0)
+      number of avail Northbridge perf ctrs = 0x0 (0)
+      number of available UMC PMCs          = 0x0 (0)
+      active UMCs bitmask                   = 0x0
+
+------------
+
+AMD, 6.13 (enable_pmu=N), Skylake-Server,-pmu.
+
+/sys/module/kvm/parameters/enable_pmu is N
+pmu is disabled
+PMU is disabled by module
+pmu_cap=0, kvm_pmu_disabled=1
+version=0, pmc=0, fixed=0
+PMU is disabled by module
+pmu_cap=0, kvm_pmu_disabled=1
+version=0, pmc=0, fixed=0
+PMU is disabled by module
+pmu_cap=0, kvm_pmu_disabled=1
+version=0, pmc=0, fixed=0
+PMU is disabled by module
+pmu_cap=0, kvm_pmu_disabled=1
+version=0, pmc=0, fixed=0
+
+[root@vm ~]# dmesg | grep Perf
+[    0.343982] Performance Events: PMU not available due to virtualization, using software events only.
+[    0.348191] NMI watchdog: Perf NMI watchdog permanently disabled
+
+[root@vm ~]# cpuid -1 -l 0x80000022
+CPU:
+   Extended Performance Monitoring and Debugging (0x80000022):
+      AMD performance monitoring V2         = false
+      AMD LBR V2                            = false
+      AMD LBR stack & PMC freezing          = false
+      number of core perf ctrs              = 0x0 (0)
+      number of LBR stack entries           = 0x0 (0)
+      number of avail Northbridge perf ctrs = 0x0 (0)
+      number of available UMC PMCs          = 0x0 (0)
+      active UMCs bitmask                   = 0x0
+
+------------
