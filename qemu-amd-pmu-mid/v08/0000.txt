@@ -1,0 +1,120 @@
+[PATCH v8 0/7] target/i386/kvm/pmu: PMU Enhancement, Bugfix and Cleanup
+
+This patchset addresses two bugs related to AMD PMU virtualization.
+
+1. The third issue is that using "-cpu host,-pmu" does not disable AMD PMU
+virtualization. When using "-cpu EPYC" or "-cpu host,-pmu", AMD PMU
+virtualization remains enabled. On the VM's Linux side, you might still
+see:
+
+[    0.510611] Performance Events: Fam17h+ core perfctr, AMD PMU driver.
+
+instead of:
+
+[    0.596381] Performance Events: PMU not available due to virtualization, using software events only.
+[    0.600972] NMI watchdog: Perf NMI watchdog permanently disabled
+
+To address this, KVM_CAP_PMU_CAPABILITY is used to set KVM_PMU_CAP_DISABLE
+when "-pmu" is configured.
+
+2. The fourth issue is that unreclaimed performance events (after a QEMU
+system_reset) in KVM may cause random, unwanted, or unknown NMIs to be
+injected into the VM.
+
+The AMD PMU registers are not reset during QEMU system_reset.
+
+(1) If the VM is reset (e.g., via QEMU system_reset or VM kdump/kexec) while
+running "perf top", the PMU registers are not disabled properly.
+
+(2) Despite x86_cpu_reset() resetting many registers to zero, kvm_put_msrs()
+does not handle AMD PMU registers, causing some PMU events to remain
+enabled in KVM.
+
+(3) The KVM kvm_pmc_speculative_in_use() function consistently returns true,
+preventing the reclamation of these events. Consequently, the
+kvm_pmc->perf_event remains active.
+
+(4) After a reboot, the VM kernel may report the following error:
+
+[    0.092011] Performance Events: Fam17h+ core perfctr, Broken BIOS detected, complain to your hardware vendor.
+[    0.092023] [Firmware Bug]: the BIOS has corrupted hw-PMU resources (MSR c0010200 is 530076)
+
+(5) In the worst case, the active kvm_pmc->perf_event may inject unknown
+NMIs randomly into the VM kernel:
+
+[...] Uhhuh. NMI received for unknown reason 30 on CPU 0.
+
+To resolve these issues, we propose resetting AMD PMU registers during the
+VM reset process
+
+
+Changed since v1:
+  - Use feature_dependencies for CPUID_EXT3_PERFCORE and
+    CPUID_8000_0022_EAX_PERFMON_V2.
+  - Remove CPUID_EXT3_PERFCORE when !cpu->enable_pmu.
+  - Pick kvm_arch_pre_create_vcpu() patch from Xiaoyao Li.
+  - Use "-pmu" but not a global "pmu-cap-disabled" for KVM_PMU_CAP_DISABLE.
+  - Also use sysfs kvm.enable_pmu=N to determine if PMU is supported.
+  - Some changes to PMU register limit calculation.
+Changed since v2:
+  - Change has_pmu_cap to pmu_cap.
+  - Use cpuid_find_entry() instead of cpu_x86_cpuid().
+  - Rework the code flow of PATCH 07 related to kvm.enable_pmu=N following
+    Zhao's suggestion.
+  - Use object_property_get_int() to get CPU family.
+  - Add support to Zhaoxin.
+Changed since v3:
+  - Re-base on top of Zhao's queued patch.
+  - Use host_cpu_vendor_fms() from Zhao's patch.
+  - Pick new version of kvm_arch_pre_create_vcpu() patch from Xiaoyao.
+  - Re-split the cases into enable_pmu and !enable_pmu, following Zhao's
+    suggestion.
+  - Check AMD directly makes the "compat" rule clear.
+  - Some changes on commit message and comment.
+  - Bring back global static variable 'kvm_pmu_disabled' read from
+    /sys/module/kvm/parameters/enable_pmu.
+Changed since v4:
+  - Re-base on top of most recent mainline QEMU.
+  - Add more Reviewed-by.
+  - All patches are reviewed.
+Changed since v5:
+  - Re-base on top of most recent mainline QEMU.
+  - Remove patch "kvm: Introduce kvm_arch_pre_create_vcpu()" as it is
+    already merged.
+  - To resolve conflicts in new [PATCH v6 3/9] , move the PMU related code
+    before the call site of is_tdx_vm().
+Changed since v6:
+  - Re-base on top of most recent mainline QEMU (staging branch).
+  - Add more Reviewed-by from Dapeng and Sandipan.
+Changed since v7:
+https://lore.kernel.org/qemu-devel/20251111061532.36702-1-dongli.zhang@oracle.com/
+  - Re-base on top of most recent mainline QEMU (staging branch).
+  - Remove PATCH 1 & 2 from the v6 patchset. Zhao may work on them in
+    another patchset.
+
+
+Dongli Zhang (7):
+  target/i386/kvm: set KVM_PMU_CAP_DISABLE if "-pmu" is configured
+  target/i386/kvm: extract unrelated code out of kvm_x86_build_cpuid()
+  target/i386/kvm: rename architectural PMU variables
+  target/i386/kvm: query kvm.enable_pmu parameter
+  target/i386/kvm: reset AMD PMU registers during VM reset
+  target/i386/kvm: support perfmon-v2 for reset
+  target/i386/kvm: don't stop Intel PMU counters
+
+ target/i386/cpu.h     |  16 ++
+ target/i386/kvm/kvm.c | 355 +++++++++++++++++++++++++++++++++++++++------
+ 2 files changed, 324 insertions(+), 47 deletions(-)
+
+branch: remotes/origin/staging
+base-commit: 942b0d378a1de9649085ad6db5306d5b8cef3591
+
+Thank you very much!
+
+Dongli Zhang
+
+
+
+============
+
+git send-email --to "qemu-devel@nongnu.org" --to "kvm@vger.kernel.org" --cc "pbonzini@redhat.com" --cc "zhao1.liu@intel.com" --cc "mtosatti@redhat.com" --cc "sandipan.das@amd.com" --cc "babu.moger@amd.com" --cc "likexu@tencent.com" --cc "like.xu.linux@gmail.com" --cc "groug@kaod.org" --cc "khorenko@virtuozzo.com" --cc "alexander.ivanov@virtuozzo.com" --cc "den@virtuozzo.com" --cc "davydov-max@yandex-team.ru" --cc "xiaoyao.li@intel.com" --cc "dapeng1.mi@linux.intel.com" --cc "joe.jin@oracle.com" --cc "ewanhai-oc@zhaoxin.com"  --cc "ewanhai@zhaoxin.com"

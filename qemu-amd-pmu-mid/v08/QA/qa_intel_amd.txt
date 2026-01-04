@@ -1,0 +1,445 @@
+------------
+
+Intel, 5.15, host,vendor=AuthenticAMD.
+
+Panic.
+
+pmu is enabled
+host_vendor=GenuineIntel
+qemu-system-x86_64: host doesn't support requested feature: vPMU
+pmu_cap=0, kvm_pmu_disabled=0
+version=0, pmc=0, fixed=0
+host_vendor=GenuineIntel
+qemu-system-x86_64: host doesn't support requested feature: vPMU
+pmu_cap=0, kvm_pmu_disabled=0
+version=0, pmc=0, fixed=0
+host_vendor=GenuineIntel
+qemu-system-x86_64: host doesn't support requested feature: vPMU
+pmu_cap=0, kvm_pmu_disabled=0
+version=0, pmc=0, fixed=0
+host_vendor=GenuineIntel
+qemu-system-x86_64: host doesn't support requested feature: vPMU
+pmu_cap=0, kvm_pmu_disabled=0
+version=0, pmc=0, fixed=0
+
+------------
+
+Intel, 5.15, host,vendor=AuthenticAMD,-pmu.
+
+Panic.
+
+pmu is disabled
+pmu_cap=0, kvm_pmu_disabled=0
+version=0, pmc=0, fixed=0
+pmu_cap=0, kvm_pmu_disabled=0
+version=0, pmc=0, fixed=0
+pmu_cap=0, kvm_pmu_disabled=0
+version=0, pmc=0, fixed=0
+pmu_cap=0, kvm_pmu_disabled=0
+version=0, pmc=0, fixed=0
+
+------------
+
+Intel, 5.15, EPYC,vendor=AuthenticAMD.
+
+pmu is disabled
+pmu_cap=0, kvm_pmu_disabled=0
+version=0, pmc=0, fixed=0
+pmu_cap=0, kvm_pmu_disabled=0
+version=0, pmc=0, fixed=0
+pmu_cap=0, kvm_pmu_disabled=0
+version=0, pmc=0, fixed=0
+pmu_cap=0, kvm_pmu_disabled=0
+version=0, pmc=0, fixed=0
+
+[root@vm ~]# dmesg | grep Perf
+[    0.331683] Performance Events: PMU not available due to virtualization, using software events only.
+[    0.336691] NMI watchdog: Perf NMI watchdog permanently disabled
+
+------------
+
+Intel, 5.15, EPYC,vendor=AuthenticAMD,+pmu.
+
+pmu is enabled
+host_vendor=GenuineIntel
+qemu-system-x86_64: host doesn't support requested feature: vPMU
+pmu_cap=0, kvm_pmu_disabled=0
+version=0, pmc=0, fixed=0
+host_vendor=GenuineIntel
+qemu-system-x86_64: host doesn't support requested feature: vPMU
+pmu_cap=0, kvm_pmu_disabled=0
+version=0, pmc=0, fixed=0
+host_vendor=GenuineIntel
+qemu-system-x86_64: host doesn't support requested feature: vPMU
+pmu_cap=0, kvm_pmu_disabled=0
+version=0, pmc=0, fixed=0
+host_vendor=GenuineIntel
+qemu-system-x86_64: host doesn't support requested feature: vPMU
+pmu_cap=0, kvm_pmu_disabled=0
+version=0, pmc=0, fixed=0
+
+[root@vm ~]# dmesg | grep Perf
+[    0.331545] Performance Events: PMU not available due to virtualization, using software events only.
+[    0.336643] NMI watchdog: Perf NMI watchdog permanently disabled
+
+------------
+
+Intel, 5.15, EPYC,vendor=AuthenticAMD,-pmu.
+
+pmu is disabled
+pmu_cap=0, kvm_pmu_disabled=0
+version=0, pmc=0, fixed=0
+pmu_cap=0, kvm_pmu_disabled=0
+version=0, pmc=0, fixed=0
+pmu_cap=0, kvm_pmu_disabled=0
+version=0, pmc=0, fixed=0
+pmu_cap=0, kvm_pmu_disabled=0
+version=0, pmc=0, fixed=0
+
+[    0.329300] Performance Events: PMU not available due to virtualization, using software events only.
+[    0.334445] NMI watchdog: Perf NMI watchdog permanently disabled
+
+------------
+
+Intel, 6.13, host,vendor=AuthenticAMD.
+
+Panic.
+
+/sys/module/kvm/parameters/enable_pmu is Y
+pmu is enabled
+host_vendor=GenuineIntel
+qemu-system-x86_64: host doesn't support requested feature: vPMU
+pmu_cap=1, kvm_pmu_disabled=0
+version=0, pmc=0, fixed=0
+host_vendor=GenuineIntel
+qemu-system-x86_64: host doesn't support requested feature: vPMU
+pmu_cap=1, kvm_pmu_disabled=0
+version=0, pmc=0, fixed=0
+host_vendor=GenuineIntel
+qemu-system-x86_64: host doesn't support requested feature: vPMU
+pmu_cap=1, kvm_pmu_disabled=0
+version=0, pmc=0, fixed=0
+host_vendor=GenuineIntel
+qemu-system-x86_64: host doesn't support requested feature: vPMU
+pmu_cap=1, kvm_pmu_disabled=0
+version=0, pmc=0, fixed=0
+
+------------
+
+Intel, 6.13, host,vendor=AuthenticAMD,-pmu.
+
+Panic.
+
+/sys/module/kvm/parameters/enable_pmu is Y
+pmu is disabled
+pmu_cap=1, kvm_pmu_disabled=0
+version=0, pmc=0, fixed=0
+pmu_cap=1, kvm_pmu_disabled=0
+version=0, pmc=0, fixed=0
+pmu_cap=1, kvm_pmu_disabled=0
+version=0, pmc=0, fixed=0
+pmu_cap=1, kvm_pmu_disabled=0
+version=0, pmc=0, fixed=0
+
+------------
+
+Intel, 6.13, EPYC,vendor=AuthenticAMD.
+
+/sys/module/kvm/parameters/enable_pmu is Y
+pmu is disabled
+pmu_cap=1, kvm_pmu_disabled=0
+version=0, pmc=0, fixed=0
+pmu_cap=1, kvm_pmu_disabled=0
+version=0, pmc=0, fixed=0
+pmu_cap=1, kvm_pmu_disabled=0
+version=0, pmc=0, fixed=0
+pmu_cap=1, kvm_pmu_disabled=0
+version=0, pmc=0, fixed=0
+
+[root@vm ~]# dmesg | grep Perf
+[    0.307235] Performance Events: PMU not available due to virtualization, using software events only.
+[    0.312112] NMI watchdog: Perf NMI watchdog permanently disabled
+
+------------
+
+Intel, 6.13, EPYC,vendor=AuthenticAMD,+pmu.
+
+/sys/module/kvm/parameters/enable_pmu is Y
+pmu is enabled
+host_vendor=GenuineIntel
+qemu-system-x86_64: host doesn't support requested feature: vPMU
+pmu_cap=1, kvm_pmu_disabled=0
+version=0, pmc=0, fixed=0
+host_vendor=GenuineIntel
+qemu-system-x86_64: host doesn't support requested feature: vPMU
+pmu_cap=1, kvm_pmu_disabled=0
+version=0, pmc=0, fixed=0
+host_vendor=GenuineIntel
+qemu-system-x86_64: host doesn't support requested feature: vPMU
+pmu_cap=1, kvm_pmu_disabled=0
+version=0, pmc=0, fixed=0
+host_vendor=GenuineIntel
+qemu-system-x86_64: host doesn't support requested feature: vPMU
+pmu_cap=1, kvm_pmu_disabled=0
+version=0, pmc=0, fixed=0
+
+[root@vm ~]# dmesg | grep Perf
+[    0.307130] Performance Events: PMU not available due to virtualization, using software events only.
+[    0.312096] NMI watchdog: Perf NMI watchdog permanently disabled
+
+------------
+
+Intel, 6.13, EPYC,vendor=AuthenticAMD,-pmu.
+
+/sys/module/kvm/parameters/enable_pmu is Y
+pmu is disabled
+pmu_cap=1, kvm_pmu_disabled=0
+version=0, pmc=0, fixed=0
+pmu_cap=1, kvm_pmu_disabled=0
+version=0, pmc=0, fixed=0
+pmu_cap=1, kvm_pmu_disabled=0
+version=0, pmc=0, fixed=0
+pmu_cap=1, kvm_pmu_disabled=0
+version=0, pmc=0, fixed=0
+
+[root@vm ~]# dmesg | grep Perf
+[    0.306314] Performance Events: PMU not available due to virtualization, using software events only.
+[    0.310528] NMI watchdog: Perf NMI watchdog permanently disabled
+
+------------
+
+Intel, 6.13, host,vendor="CentaurHauls",+pmu
+
+/sys/module/kvm/parameters/enable_pmu is Y
+pmu is enabled
+host_vendor=GenuineIntel
+vendor compatible!
+pmu_cap=1, kvm_pmu_disabled=0
+version=2, pmc=8, fixed=3
+host_vendor=GenuineIntel
+vendor compatible!
+pmu_cap=1, kvm_pmu_disabled=0
+version=2, pmc=8, fixed=3
+host_vendor=GenuineIntel
+vendor compatible!
+pmu_cap=1, kvm_pmu_disabled=0
+version=2, pmc=8, fixed=3
+host_vendor=GenuineIntel
+vendor compatible!
+pmu_cap=1, kvm_pmu_disabled=0
+version=2, pmc=8, fixed=3
+kvm_put_msrs() reset Intel or Zhaoxin
+kvm_put_msrs() reset Intel or Zhaoxin
+kvm_put_msrs() reset Intel or Zhaoxin
+kvm_put_msrs() reset Intel or Zhaoxin
+kvm_get_msrs() reset Intel or Zhaoxin
+kvm_get_msrs() reset Intel or Zhaoxin
+kvm_get_msrs() reset Intel or Zhaoxin
+kvm_get_msrs() reset Intel or Zhaoxin
+kvm_put_msrs() reset Intel or Zhaoxin
+kvm_put_msrs() reset Intel or Zhaoxin
+kvm_put_msrs() reset Intel or Zhaoxin
+kvm_put_msrs() reset Intel or Zhaoxin
+kvm_get_msrs() reset Intel or Zhaoxin
+
+
+[root@vm ~]# dmesg | grep Perf
+[    0.224211] Performance Events:
+[    0.227423] NMI watchdog: Perf NMI watchdog permanently disabled
+
+[root@vm ~]# cpuid -1 -l 0xa
+CPU:
+   Architecture Performance Monitoring Features (0xa):
+      version ID                               = 0x2 (2)
+      number of counters per logical processor = 0x8 (8)
+      bit width of counter                     = 0x30 (48)
+      length of EBX bit vector                 = 0x8 (8)
+      core cycle event                         = available
+      instruction retired event                = available
+      reference cycles event                   = available
+      last-level cache ref event               = available
+      last-level cache miss event              = available
+      branch inst retired event                = available
+      branch mispred retired event             = available
+      top-down slots event                     = available
+... ...
+      number of contiguous fixed counters      = 0x3 (3)
+      bit width of fixed counters              = 0x30 (48)
+      anythread deprecation                    = true
+
+------------
+
+Intel, 6.13, YongFeng,vendor="CentaurHauls",+pmu
+
+/sys/module/kvm/parameters/enable_pmu is Y
+pmu is enabled
+host_vendor=GenuineIntel
+vendor compatible!
+pmu_cap=1, kvm_pmu_disabled=0
+version=2, pmc=8, fixed=3
+host_vendor=GenuineIntel
+vendor compatible!
+pmu_cap=1, kvm_pmu_disabled=0
+version=2, pmc=8, fixed=3
+host_vendor=GenuineIntel
+vendor compatible!
+pmu_cap=1, kvm_pmu_disabled=0
+version=2, pmc=8, fixed=3
+host_vendor=GenuineIntel
+vendor compatible!
+pmu_cap=1, kvm_pmu_disabled=0
+version=2, pmc=8, fixed=3
+kvm_put_msrs() reset Intel or Zhaoxin
+kvm_put_msrs() reset Intel or Zhaoxin
+kvm_put_msrs() reset Intel or Zhaoxin
+kvm_put_msrs() reset Intel or Zhaoxin
+kvm_get_msrs() reset Intel or Zhaoxin
+kvm_get_msrs() reset Intel or Zhaoxin
+kvm_get_msrs() reset Intel or Zhaoxin
+kvm_get_msrs() reset Intel or Zhaoxin
+kvm_put_msrs() reset Intel or Zhaoxin
+kvm_put_msrs() reset Intel or Zhaoxin
+kvm_put_msrs() reset Intel or Zhaoxin
+kvm_put_msrs() reset Intel or Zhaoxin
+kvm_get_msrs() reset Intel or Zhaoxin
+kvm_get_msrs() reset Intel or Zhaoxin
+kvm_get_msrs() reset Intel or Zhaoxin
+
+[root@vm ~]# dmesg | grep Perf
+[    0.235183] Performance Events: 
+[    0.238388] NMI watchdog: Perf NMI watchdog permanently disabled
+
+[root@vm ~]# cpuid -1 -l 0xa
+CPU:
+   Architecture Performance Monitoring Features (0xa):
+      version ID                               = 0x2 (2)
+      number of counters per logical processor = 0x8 (8)
+      bit width of counter                     = 0x30 (48)
+      length of EBX bit vector                 = 0x8 (8)
+      core cycle event                         = available
+      instruction retired event                = available
+      reference cycles event                   = available
+      last-level cache ref event               = available
+      last-level cache miss event              = available
+      branch inst retired event                = available
+      branch mispred retired event             = available
+      top-down slots event                     = available
+... ...
+      number of contiguous fixed counters      = 0x3 (3)
+      bit width of fixed counters              = 0x30 (48)
+      anythread deprecation                    = true
+
+------------
+
+Intel, 6.13 (enable_pmu=N), host,vendor=AuthenticAMD.
+
+Panic.
+
+/sys/module/kvm/parameters/enable_pmu is N
+pmu is enabled
+qemu-system-x86_64: warning: Failed to enable PMU since KVM's enable_pmu parameter is disabled
+PMU is disabled by module
+pmu_cap=0, kvm_pmu_disabled=1
+version=0, pmc=0, fixed=0
+PMU is disabled by module
+pmu_cap=0, kvm_pmu_disabled=1
+version=0, pmc=0, fixed=0
+PMU is disabled by module
+pmu_cap=0, kvm_pmu_disabled=1
+version=0, pmc=0, fixed=0
+PMU is disabled by module
+pmu_cap=0, kvm_pmu_disabled=1
+version=0, pmc=0, fixed=0
+
+------------
+
+Intel, 6.13 (enable_pmu=N), host,vendor=AuthenticAMD,-pmu.
+
+Panic.
+
+/sys/module/kvm/parameters/enable_pmu is N
+pmu is disabled
+PMU is disabled by module
+pmu_cap=0, kvm_pmu_disabled=1
+version=0, pmc=0, fixed=0
+PMU is disabled by module
+pmu_cap=0, kvm_pmu_disabled=1
+version=0, pmc=0, fixed=0
+PMU is disabled by module
+pmu_cap=0, kvm_pmu_disabled=1
+version=0, pmc=0, fixed=0
+PMU is disabled by module
+pmu_cap=0, kvm_pmu_disabled=1
+version=0, pmc=0, fixed=0
+
+------------
+
+Intel, 6.13 (enable_pmu=N), EPYC,vendor=AuthenticAMD.
+
+/sys/module/kvm/parameters/enable_pmu is N
+pmu is disabled
+PMU is disabled by module
+pmu_cap=0, kvm_pmu_disabled=1
+version=0, pmc=0, fixed=0
+PMU is disabled by module
+pmu_cap=0, kvm_pmu_disabled=1
+version=0, pmc=0, fixed=0
+PMU is disabled by module
+pmu_cap=0, kvm_pmu_disabled=1
+version=0, pmc=0, fixed=0
+PMU is disabled by module
+pmu_cap=0, kvm_pmu_disabled=1
+version=0, pmc=0, fixed=0
+
+[root@vm ~]# dmesg | grep Perf
+[    0.307909] Performance Events: PMU not available due to virtualization, using software events only.
+[    0.312824] NMI watchdog: Perf NMI watchdog permanently disabled
+
+------------
+
+Intel, 6.13 (enable_pmu=N), EPYC,vendor=AuthenticAMD,+pmu.
+
+/sys/module/kvm/parameters/enable_pmu is N
+pmu is enabled
+qemu-system-x86_64: warning: Failed to enable PMU since KVM's enable_pmu parameter is disabled
+PMU is disabled by module
+pmu_cap=0, kvm_pmu_disabled=1
+version=0, pmc=0, fixed=0
+PMU is disabled by module
+pmu_cap=0, kvm_pmu_disabled=1
+version=0, pmc=0, fixed=0
+PMU is disabled by module
+pmu_cap=0, kvm_pmu_disabled=1
+version=0, pmc=0, fixed=0
+PMU is disabled by module
+pmu_cap=0, kvm_pmu_disabled=1
+version=0, pmc=0, fixed=0
+
+[root@vm ~]# dmesg | grep Perf
+[    0.306231] Performance Events: PMU not available due to virtualization, using software events only.
+[    0.311447] NMI watchdog: Perf NMI watchdog permanently disabled
+
+------------
+
+Intel, 6.13 (enable_pmu=N), EPYC,vendor=AuthenticAMD,-pmu.
+
+/sys/module/kvm/parameters/enable_pmu is N
+pmu is disabled
+PMU is disabled by module
+pmu_cap=0, kvm_pmu_disabled=1
+version=0, pmc=0, fixed=0
+PMU is disabled by module
+pmu_cap=0, kvm_pmu_disabled=1
+version=0, pmc=0, fixed=0
+PMU is disabled by module
+pmu_cap=0, kvm_pmu_disabled=1
+version=0, pmc=0, fixed=0
+PMU is disabled by module
+pmu_cap=0, kvm_pmu_disabled=1
+version=0, pmc=0, fixed=0
+
+[root@vm ~]# dmesg | grep Perf
+[    0.307117] Performance Events: PMU not available due to virtualization, using software events only.
+[    0.312131] NMI watchdog: Perf NMI watchdog permanently disabled
+
+------------

@@ -1,0 +1,376 @@
+------------
+
+AMD, 5.15, host,vendor=GenuineIntel.
+
+Panic.
+
+pmu is enabled
+host_vendor=AuthenticAMD
+qemu-system-x86_64: host doesn't support requested feature: vPMU
+pmu_cap=0, kvm_pmu_disabled=0
+version=0, pmc=0, fixed=0
+host_vendor=AuthenticAMD
+qemu-system-x86_64: host doesn't support requested feature: vPMU
+pmu_cap=0, kvm_pmu_disabled=0
+version=0, pmc=0, fixed=0
+host_vendor=AuthenticAMD
+qemu-system-x86_64: host doesn't support requested feature: vPMU
+pmu_cap=0, kvm_pmu_disabled=0
+version=0, pmc=0, fixed=0
+host_vendor=AuthenticAMD
+qemu-system-x86_64: host doesn't support requested feature: vPMU
+pmu_cap=0, kvm_pmu_disabled=0
+version=0, pmc=0, fixed=0
+
+------------
+
+AMD, 5.15, host,vendor=GenuineIntel,-pmu.
+
+Panic.
+
+pmu is disabled
+pmu_cap=0, kvm_pmu_disabled=0
+version=0, pmc=0, fixed=0
+pmu_cap=0, kvm_pmu_disabled=0
+version=0, pmc=0, fixed=0
+pmu_cap=0, kvm_pmu_disabled=0
+version=0, pmc=0, fixed=0
+pmu_cap=0, kvm_pmu_disabled=0
+version=0, pmc=0, fixed=0
+
+------------
+
+AMD, 5.15, Skylake-Server,vendor=GenuineIntel.
+
+pmu is disabled
+pmu_cap=0, kvm_pmu_disabled=0
+version=0, pmc=0, fixed=0
+pmu_cap=0, kvm_pmu_disabled=0
+version=0, pmc=0, fixed=0
+pmu_cap=0, kvm_pmu_disabled=0
+version=0, pmc=0, fixed=0
+pmu_cap=0, kvm_pmu_disabled=0
+version=0, pmc=0, fixed=0
+
+[root@vm ~]# dmesg | grep Perf
+[    0.370180] Performance Events: unsupported p6 CPU model 85 no PMU driver, software events only.
+[    0.373388] NMI watchdog: Perf NMI watchdog permanently disabled
+
+------------
+
+AMD, 5.15, Skylake-Server,vendor=GenuineIntel,+pmu.
+
+pmu is enabled
+host_vendor=AuthenticAMD
+qemu-system-x86_64: host doesn't support requested feature: vPMU
+pmu_cap=0, kvm_pmu_disabled=0
+version=0, pmc=0, fixed=0
+host_vendor=AuthenticAMD
+qemu-system-x86_64: host doesn't support requested feature: vPMU
+pmu_cap=0, kvm_pmu_disabled=0
+version=0, pmc=0, fixed=0
+host_vendor=AuthenticAMD
+qemu-system-x86_64: host doesn't support requested feature: vPMU
+pmu_cap=0, kvm_pmu_disabled=0
+version=0, pmc=0, fixed=0
+host_vendor=AuthenticAMD
+qemu-system-x86_64: host doesn't support requested feature: vPMU
+pmu_cap=0, kvm_pmu_disabled=0
+version=0, pmc=0, fixed=0
+
+[root@vm ~]# dmesg | grep Perf
+[    0.372346] Performance Events: unsupported p6 CPU model 85 no PMU driver, software events only.
+[    0.375551] NMI watchdog: Perf NMI watchdog permanently disabled
+
+------------
+
+AMD, 5.15, Skylake-Server,vendor=GenuineIntel,-pmu.
+
+pmu is disabled
+pmu_cap=0, kvm_pmu_disabled=0
+version=0, pmc=0, fixed=0
+pmu_cap=0, kvm_pmu_disabled=0
+version=0, pmc=0, fixed=0
+pmu_cap=0, kvm_pmu_disabled=0
+version=0, pmc=0, fixed=0
+pmu_cap=0, kvm_pmu_disabled=0
+version=0, pmc=0, fixed=0
+
+[root@vm ~]# dmesg | grep Perf
+[    0.371238] Performance Events: unsupported p6 CPU model 85 no PMU driver, software events only.
+[    0.374445] NMI watchdog: Perf NMI watchdog permanently disabled
+
+------------
+
+AMD, 6.13, host,vendor=GenuineIntel.
+
+Panic.
+
+/sys/module/kvm/parameters/enable_pmu is Y
+pmu is enabled
+host_vendor=AuthenticAMD
+qemu-system-x86_64: host doesn't support requested feature: vPMU
+pmu_cap=1, kvm_pmu_disabled=0
+version=0, pmc=0, fixed=0
+host_vendor=AuthenticAMD
+qemu-system-x86_64: host doesn't support requested feature: vPMU
+pmu_cap=1, kvm_pmu_disabled=0
+version=0, pmc=0, fixed=0
+host_vendor=AuthenticAMD
+qemu-system-x86_64: host doesn't support requested feature: vPMU
+pmu_cap=1, kvm_pmu_disabled=0
+version=0, pmc=0, fixed=0
+host_vendor=AuthenticAMD
+qemu-system-x86_64: host doesn't support requested feature: vPMU
+pmu_cap=1, kvm_pmu_disabled=0
+version=0, pmc=0, fixed=0
+
+------------
+
+AMD, 6.13, host,vendor=GenuineIntel,-pmu.
+
+Panic.
+
+/sys/module/kvm/parameters/enable_pmu is Y
+pmu is disabled
+pmu_cap=1, kvm_pmu_disabled=0
+version=0, pmc=0, fixed=0
+pmu_cap=1, kvm_pmu_disabled=0
+version=0, pmc=0, fixed=0
+pmu_cap=1, kvm_pmu_disabled=0
+version=0, pmc=0, fixed=0
+pmu_cap=1, kvm_pmu_disabled=0
+version=0, pmc=0, fixed=0
+
+------------
+
+AMD, 6.13, Skylake-Server,vendor=GenuineIntel.
+
+/sys/module/kvm/parameters/enable_pmu is Y
+pmu is disabled
+pmu_cap=1, kvm_pmu_disabled=0
+version=0, pmc=0, fixed=0
+pmu_cap=1, kvm_pmu_disabled=0
+version=0, pmc=0, fixed=0
+pmu_cap=1, kvm_pmu_disabled=0
+version=0, pmc=0, fixed=0
+pmu_cap=1, kvm_pmu_disabled=0
+version=0, pmc=0, fixed=0
+
+[root@vm ~]# dmesg | grep Perf
+[    0.348372] Performance Events: unsupported p6 CPU model 85 no PMU driver, software events only.
+[    0.351569] NMI watchdog: Perf NMI watchdog permanently disabled
+
+------------
+
+AMD, 6.13, Skylake-Server,vendor=GenuineIntel,+pmu.
+
+/sys/module/kvm/parameters/enable_pmu is Y
+pmu is enabled
+host_vendor=AuthenticAMD
+qemu-system-x86_64: host doesn't support requested feature: vPMU
+pmu_cap=1, kvm_pmu_disabled=0
+version=0, pmc=0, fixed=0
+host_vendor=AuthenticAMD
+qemu-system-x86_64: host doesn't support requested feature: vPMU
+pmu_cap=1, kvm_pmu_disabled=0
+version=0, pmc=0, fixed=0
+host_vendor=AuthenticAMD
+qemu-system-x86_64: host doesn't support requested feature: vPMU
+pmu_cap=1, kvm_pmu_disabled=0
+version=0, pmc=0, fixed=0
+host_vendor=AuthenticAMD
+qemu-system-x86_64: host doesn't support requested feature: vPMU
+pmu_cap=1, kvm_pmu_disabled=0
+version=0, pmc=0, fixed=0
+
+[root@vm ~]# dmesg | grep Perf
+[    0.351570] Performance Events: unsupported p6 CPU model 85 no PMU driver, software events only.
+[    0.354772] NMI watchdog: Perf NMI watchdog permanently disabled
+
+------------
+
+AMD, 6.13, Skylake-Server,vendor=GenuineIntel,-pmu.
+
+/sys/module/kvm/parameters/enable_pmu is Y
+pmu is disabled
+pmu_cap=1, kvm_pmu_disabled=0
+version=0, pmc=0, fixed=0
+pmu_cap=1, kvm_pmu_disabled=0
+version=0, pmc=0, fixed=0
+pmu_cap=1, kvm_pmu_disabled=0
+version=0, pmc=0, fixed=0
+pmu_cap=1, kvm_pmu_disabled=0
+version=0, pmc=0, fixed=0
+
+[root@vm ~]# dmesg | grep Perf
+[    0.349172] Performance Events: unsupported p6 CPU model 85 no PMU driver, software events only.
+[    0.352367] NMI watchdog: Perf NMI watchdog permanently disabled
+
+------------
+
+AMD, 6.13, host,vendor="CentaurHauls",+pmu
+
+Panic.
+
+/sys/module/kvm/parameters/enable_pmu is Y
+pmu is enabled
+host_vendor=AuthenticAMD
+qemu-system-x86_64: host doesn't support requested feature: vPMU
+pmu_cap=1, kvm_pmu_disabled=0
+version=0, pmc=0, fixed=0
+host_vendor=AuthenticAMD
+qemu-system-x86_64: host doesn't support requested feature: vPMU
+pmu_cap=1, kvm_pmu_disabled=0
+version=0, pmc=0, fixed=0
+host_vendor=AuthenticAMD
+qemu-system-x86_64: host doesn't support requested feature: vPMU
+pmu_cap=1, kvm_pmu_disabled=0
+version=0, pmc=0, fixed=0
+host_vendor=AuthenticAMD
+qemu-system-x86_64: host doesn't support requested feature: vPMU
+pmu_cap=1, kvm_pmu_disabled=0
+version=0, pmc=0, fixed=0
+
+------------
+
+AMD, 6.13, YongFeng,vendor="CentaurHauls",+pmu
+
+/sys/module/kvm/parameters/enable_pmu is Y
+pmu is enabled
+host_vendor=AuthenticAMD
+qemu-system-x86_64: host doesn't support requested feature: vPMU
+pmu_cap=1, kvm_pmu_disabled=0
+version=0, pmc=0, fixed=0
+host_vendor=AuthenticAMD
+qemu-system-x86_64: host doesn't support requested feature: vPMU
+pmu_cap=1, kvm_pmu_disabled=0
+version=0, pmc=0, fixed=0
+host_vendor=AuthenticAMD
+qemu-system-x86_64: host doesn't support requested feature: vPMU
+pmu_cap=1, kvm_pmu_disabled=0
+version=0, pmc=0, fixed=0
+host_vendor=AuthenticAMD
+qemu-system-x86_64: host doesn't support requested feature: vPMU
+pmu_cap=1, kvm_pmu_disabled=0
+version=0, pmc=0, fixed=0
+
+[root@vm ~]# dmesg | grep Perf
+[    0.337176] Performance Events: 
+[    0.342385] NMI watchdog: Perf NMI watchdog permanently disabled
+
+------------
+
+AMD, 6.13 (enable_pmu=N), host,vendor=GenuineIntel.
+
+Panic.
+
+/sys/module/kvm/parameters/enable_pmu is N
+QEMU 10.2.50 monitor - type 'help' for more information
+pmu is enabled
+qemu-system-x86_64: warning: Failed to enable PMU since KVM's enable_pmu parameter is disabled
+PMU is disabled by module
+pmu_cap=0, kvm_pmu_disabled=1
+version=0, pmc=0, fixed=0
+PMU is disabled by module
+pmu_cap=0, kvm_pmu_disabled=1
+version=0, pmc=0, fixed=0
+PMU is disabled by module
+pmu_cap=0, kvm_pmu_disabled=1
+version=0, pmc=0, fixed=0
+PMU is disabled by module
+pmu_cap=0, kvm_pmu_disabled=1
+version=0, pmc=0, fixed=0
+
+------------
+
+AMD, 6.13 (enable_pmu=N), host,vendor=GenuineIntel,-pmu.
+
+Panic.
+
+/sys/module/kvm/parameters/enable_pmu is N
+pmu is disabled
+PMU is disabled by module
+pmu_cap=0, kvm_pmu_disabled=1
+version=0, pmc=0, fixed=0
+PMU is disabled by module
+pmu_cap=0, kvm_pmu_disabled=1
+version=0, pmc=0, fixed=0
+PMU is disabled by module
+pmu_cap=0, kvm_pmu_disabled=1
+version=0, pmc=0, fixed=0
+PMU is disabled by module
+pmu_cap=0, kvm_pmu_disabled=1
+version=0, pmc=0, fixed=0
+
+------------
+
+AMD, 6.13 (enable_pmu=N), Skylake-Server,vendor=GenuineIntel.
+
+/sys/module/kvm/parameters/enable_pmu is N
+pmu is disabled
+PMU is disabled by module
+pmu_cap=0, kvm_pmu_disabled=1
+version=0, pmc=0, fixed=0
+PMU is disabled by module
+pmu_cap=0, kvm_pmu_disabled=1
+version=0, pmc=0, fixed=0
+PMU is disabled by module
+pmu_cap=0, kvm_pmu_disabled=1
+version=0, pmc=0, fixed=0
+PMU is disabled by module
+pmu_cap=0, kvm_pmu_disabled=1
+version=0, pmc=0, fixed=0
+
+[root@vm ~]# dmesg | grep Perf
+[    0.352960] Performance Events: unsupported p6 CPU model 85 no PMU driver, software events only.
+[    0.356168] NMI watchdog: Perf NMI watchdog permanently disabled
+
+------------
+
+AMD, 6.13 (enable_pmu=N), Skylake-Server,vendor=GenuineIntel,+pmu.
+
+/sys/module/kvm/parameters/enable_pmu is N
+pmu is enabled
+qemu-system-x86_64: warning: Failed to enable PMU since KVM's enable_pmu parameter is disabled
+PMU is disabled by module
+pmu_cap=0, kvm_pmu_disabled=1
+version=0, pmc=0, fixed=0
+PMU is disabled by module
+pmu_cap=0, kvm_pmu_disabled=1
+version=0, pmc=0, fixed=0
+PMU is disabled by module
+pmu_cap=0, kvm_pmu_disabled=1
+version=0, pmc=0, fixed=0
+PMU is disabled by module
+pmu_cap=0, kvm_pmu_disabled=1
+version=0, pmc=0, fixed=0
+
+[root@vm ~]# dmesg | grep Perf
+[    0.349315] Performance Events: unsupported p6 CPU model 85 no PMU driver, software events only.
+[    0.352518] NMI watchdog: Perf NMI watchdog permanently disabled
+
+------------
+
+AMD, 6.13 (enable_pmu=N), Skylake-Server,vendor=GenuineIntel,-pmu.
+
+/sys/module/kvm/parameters/enable_pmu is N
+pmu is disabled
+PMU is disabled by module
+pmu_cap=0, kvm_pmu_disabled=1
+version=0, pmc=0, fixed=0
+PMU is disabled by module
+pmu_cap=0, kvm_pmu_disabled=1
+version=0, pmc=0, fixed=0
+PMU is disabled by module
+pmu_cap=0, kvm_pmu_disabled=1
+version=0, pmc=0, fixed=0
+PMU is disabled by module
+pmu_cap=0, kvm_pmu_disabled=1
+version=0, pmc=0, fixed=0
+
+[root@vm ~]# dmesg | grep Perf
+[    0.350224] Performance Events: unsupported p6 CPU model 85 no PMU driver, software events only.
+[    0.353441] NMI watchdog: Perf NMI watchdog permanently disabled
+
+------------
