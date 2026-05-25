@@ -1,0 +1,68 @@
+From 57a4db7dd0309b6e37c0ed400942b19bc94a36c3 Mon Sep 17 00:00:00 2001
+From: Dongli Zhang <dongli.zhang@oracle.com>
+Date: Thu, 16 Apr 2026 00:33:51 -0700
+Subject: [PATCH 2/5] KVM: x86: Reset vcpu->arch.st.last_steal when enabling
+ steal time
+
+KVM does not support vCPU hotplug. When a vCPU is removed, its
+corresponding data structures are not freed by KVM. Instead, QEMU destroys
+only the userspace state and the vCPU thread, while the KVM vCPU fd remains
+open and parked in QEMU.
+
+As a result, vcpu->arch.st.last_steal is not reset.
+
+If the same vCPU is later re-created by QEMU, last_steal retains its old
+value, while current->sched_info.run_delay starts from zero since a new
+vCPU thread is created. This causes
+current->sched_info.run_delay - vcpu->arch.st.last_steal to produce a
+large, bogus value.
+
+Fix this by resetting vcpu->arch.st.last_steal to
+current->sched_info.run_delay when KVM steal time is enabled.
+
+Signed-off-by: Dongli Zhang <dongli.zhang@oracle.com>
+---
+ arch/x86/include/asm/kvm_host.h | 1 +
+ arch/x86/kvm/x86.c              | 7 +++++++
+ 2 files changed, 8 insertions(+)
+
+diff --git a/arch/x86/include/asm/kvm_host.h b/arch/x86/include/asm/kvm_host.h
+index c470e40a00aa..1f1f29128c5d 100644
+--- a/arch/x86/include/asm/kvm_host.h
++++ b/arch/x86/include/asm/kvm_host.h
+@@ -960,6 +960,7 @@ struct kvm_vcpu_arch {
+ 		u64 msr_val;
+ 		u64 last_steal;
+ 		struct gfn_to_hva_cache cache;
++		bool need_reset;
+ 	} st;
+ 
+ 	u64 l1_tsc_offset;
+diff --git a/arch/x86/kvm/x86.c b/arch/x86/kvm/x86.c
+index 0a1b63c63d1a..eec578894ad5 100644
+--- a/arch/x86/kvm/x86.c
++++ b/arch/x86/kvm/x86.c
+@@ -3829,6 +3829,12 @@ static void record_steal_time(struct kvm_vcpu *vcpu)
+ 	smp_wmb();
+ 
+ 	unsafe_get_user(steal, &st->steal, out);
++
++	if (vcpu->arch.st.need_reset) {
++		vcpu->arch.st.need_reset = false;
++		vcpu->arch.st.last_steal = current->sched_info.run_delay;
++	}
++
+ 	steal += current->sched_info.run_delay -
+ 		vcpu->arch.st.last_steal;
+ 	vcpu->arch.st.last_steal = current->sched_info.run_delay;
+@@ -4178,6 +4184,7 @@ int kvm_set_msr_common(struct kvm_vcpu *vcpu, struct msr_data *msr_info)
+ 		if (!(data & KVM_MSR_ENABLED))
+ 			break;
+ 
++		vcpu->arch.st.need_reset = true;
+ 		kvm_make_request(KVM_REQ_STEAL_UPDATE, vcpu);
+ 
+ 		break;
+-- 
+2.39.3
+

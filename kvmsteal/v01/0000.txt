@@ -1,0 +1,98 @@
+[PATCH 0/5] Fix and enhance KVM steal accounting for both guest and host
+
+This patchset resolves two issue releted to KVM steal time accounting.
+
+1. KVM does not support vCPU hotplug. When a vCPU is removed, its
+corresponding data structures are not freed by KVM. Instead, QEMU destroys
+only the userspace state and the vCPU thread, while the KVM vCPU fd remains
+open and parked in QEMU.
+
+As a result, vcpu->arch.st.last_steal is not reset. If the same vCPU is
+later re-created by QEMU, last_steal retains its old value, while
+current->sched_info.run_delay starts from zero since a new vCPU thread is
+created. This causes current->sched_info.run_delay - vcpu->arch.st.last_steal
+to produce a large, bogus value.
+
+For instance, current->sched_info.run_delay can become smaller than
+vcpu->arch.st.last_steal (see line 3832) if a QEMU vCPU is re-added after
+it has previously been removed.
+
+As a result, st->steal restarts from a very small value, close to
+current->sched_info.run_delay.
+
+3748 static void record_steal_time(struct kvm_vcpu *vcpu)
+3749 {
+3831         unsafe_get_user(steal, &st->steal, out);
+3832         steal += current->sched_info.run_delay -
+3833                 vcpu->arch.st.last_steal;
+3834         vcpu->arch.st.last_steal = current->sched_info.run_delay;
+3835         unsafe_put_user(steal, &st->steal, out);
+
+This means that, from the guest VM, paravirt_steal_clock() for a newly added
+vCPU starts from a very small value.
+
+Since this_rq()->prev_steal_time is not reset during vCPU hotplug, it may
+exceed paravirt_steal_clock(). This results in a negative delta (interpreted as
+a large u64) being accounted to cpustat[CPUTIME_STEAL], causing it to appear
+either very small or to start from a large u64 value (as line 275).
+
+268 static __always_inline u64 steal_account_process_time(u64 maxtime)
+269 {
+270 #ifdef CONFIG_PARAVIRT
+271         if (static_key_false(&paravirt_steal_enabled)) {
+272                 u64 steal;
+273
+274                 steal = paravirt_steal_clock(smp_processor_id());
+275                 steal -= this_rq()->prev_steal_time;
+276                 steal = min(steal, maxtime);
+277                 account_steal_time(steal);
+278                 this_rq()->prev_steal_time += steal;
+279
+280                 return steal;
+281         }
+282 #endif /* CONFIG_PARAVIRT */
+283         return 0;
+284 }
+
+This patchset fixes the issue on both the KVM guest and host sides by resetting
+prev_steal_time/prev_steal_time_rq and vcpu->arch.st.last_steal when KVM steal
+time is enabled.
+
+
+2. The KVM_CLOCK_REALTIME has been introduced to help track the downtime of
+live migration. KVM uses that realtime value to advance guest clock, but
+the same blackout is not reflected in KVM steal time.
+
+Account that same delta in steal time directly in kvm_vm_ioctl_set_clock(),
+only when KVM_CLOCK_REALTIME is used. This keeps the KVM-only solution
+self-contained and avoids adding a new KVM ioctl or requiring additional
+userspace changes (i.e. QEMU).
+
+
+I have also created two KVM selftests.
+
+
+Dongli Zhang (5):
+  x86/kvm: Reset prev_steal_time and prev_steal_time_rq when enabling steal time
+  KVM: x86: Reset vcpu->arch.st.last_steal when enabling steal time
+  KVM: x86: account KVM_SET_CLOCK downtime in steal time
+  KVM: selftests: Test steal time when re-adding a vCPU on a new thread
+  KVM: selftests: Test KVM_SET_CLOCK downtime in steal time
+
+ arch/x86/include/asm/kvm_host.h                 |   4 +
+ arch/x86/kernel/kvm.c                           |  40 +++---
+ arch/x86/kvm/x86.c                              |  32 ++++-
+ include/linux/sched/cputime.h                   |   2 +
+ kernel/sched/cputime.c                          |  10 ++
+ tools/testing/selftests/kvm/Makefile.kvm        |   1 +
+ .../testing/selftests/kvm/x86/kvm_clock_test.c  |  42 ++++--
+ .../selftests/kvm/x86/steal_time_reset_test.c   | 144 +++++++++++++++++++
+ 8 files changed, 248 insertions(+), 27 deletions(-)
+
+Thank you very much!
+
+Dongli Zhang
+
+----------
+
+git send-email --to "kvm@vger.kernel.org" --to "x86@kernel.org" --to "linux-kselftest@vger.kernel.org" --cc "seanjc@google.com" --cc "pbonzini@redhat.com" --cc "vkuznets@redhat.com" --cc "tglx@kernel.org" --cc "mingo@redhat.com" --cc "bp@alien8.de" --cc "dave.hansen@linux.intel.com" --cc "shuah@kernel.org" --cc "hpa@zytor.com" --cc "peterz@infradead.org" --cc "juri.lelli@redhat.com" --cc "vincent.guittot@linaro.org" --cc "dietmar.eggemann@arm.com" --cc "rostedt@goodmis.org" --cc "bsegall@google.com" --cc "mgorman@suse.de" --cc "vschneid@redhat.com" --cc "kprateek.nayak@amd.com" --cc "jgross@suse.com" --cc "dwmw2@infradead.org" --cc "joe.jin@oracle.com" 

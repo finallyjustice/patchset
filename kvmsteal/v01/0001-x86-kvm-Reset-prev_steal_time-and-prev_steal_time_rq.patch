@@ -1,0 +1,128 @@
+From 620ff83ca15e8f93b663d0483ae2eb8d1bb6be70 Mon Sep 17 00:00:00 2001
+From: Dongli Zhang <dongli.zhang@oracle.com>
+Date: Sun, 19 Apr 2026 22:49:03 -0700
+Subject: [PATCH 1/5] x86/kvm: Reset prev_steal_time and prev_steal_time_rq
+ when enabling steal time
+
+kvm_steal_clock() is not guaranteed to be monotonic, especially during vCPU
+hotplug, and may restart from a small value due to a KVM bug.
+
+Since per-vCPU prev_steal_time and prev_steal_time_rq are not reset on vCPU
+hotplug, they can become larger than the value returned by
+paravirt_steal_clock(), leading to incorrect accounting.
+
+Reset both prev_steal_time and prev_steal_time_rq when enabling KVM steal
+time paravirtualization to avoid this issue.
+
+A fix for the underlying KVM hypervisor steal time accounting bug will be
+addressed in a subsequent patch.
+
+Signed-off-by: Dongli Zhang <dongli.zhang@oracle.com>
+---
+ arch/x86/kernel/kvm.c         | 40 ++++++++++++++++++++---------------
+ include/linux/sched/cputime.h |  2 ++
+ kernel/sched/cputime.c        | 10 +++++++++
+ 3 files changed, 35 insertions(+), 17 deletions(-)
+
+diff --git a/arch/x86/kernel/kvm.c b/arch/x86/kernel/kvm.c
+index 29226d112029..819abd3a9a26 100644
+--- a/arch/x86/kernel/kvm.c
++++ b/arch/x86/kernel/kvm.c
+@@ -328,6 +328,23 @@ static void __init paravirt_ops_setup(void)
+ #endif
+ }
+ 
++static u64 kvm_steal_clock(int cpu)
++{
++	u64 steal;
++	struct kvm_steal_time *src;
++	int version;
++
++	src = &per_cpu(steal_time, cpu);
++	do {
++		version = src->version;
++		virt_rmb();
++		steal = src->steal;
++		virt_rmb();
++	} while ((version & 1) || (version != src->version));
++
++	return steal;
++}
++
+ static void kvm_register_steal_time(void)
+ {
+ 	int cpu = smp_processor_id();
+@@ -337,6 +354,12 @@ static void kvm_register_steal_time(void)
+ 		return;
+ 
+ 	wrmsrq(MSR_KVM_STEAL_TIME, (slow_virt_to_phys(st) | KVM_MSR_ENABLED));
++
++	/*
++	 * This CPU is not ready to be scheduled yet.
++	 */
++	sched_steal_time_cpu_init(cpu, kvm_steal_clock(cpu));
++
+ 	pr_debug("stealtime: cpu %d, msr %llx\n", cpu,
+ 		(unsigned long long) slow_virt_to_phys(st));
+ }
+@@ -411,23 +434,6 @@ static void kvm_disable_steal_time(void)
+ 	wrmsrq(MSR_KVM_STEAL_TIME, 0);
+ }
+ 
+-static u64 kvm_steal_clock(int cpu)
+-{
+-	u64 steal;
+-	struct kvm_steal_time *src;
+-	int version;
+-
+-	src = &per_cpu(steal_time, cpu);
+-	do {
+-		version = src->version;
+-		virt_rmb();
+-		steal = src->steal;
+-		virt_rmb();
+-	} while ((version & 1) || (version != src->version));
+-
+-	return steal;
+-}
+-
+ static inline __init void __set_percpu_decrypted(void *ptr, unsigned long size)
+ {
+ 	early_set_memory_decrypted((unsigned long) ptr, size);
+diff --git a/include/linux/sched/cputime.h b/include/linux/sched/cputime.h
+index e90efaf6d26e..7a0313bd053a 100644
+--- a/include/linux/sched/cputime.h
++++ b/include/linux/sched/cputime.h
+@@ -186,6 +186,8 @@ struct static_key;
+ extern struct static_key paravirt_steal_enabled;
+ extern struct static_key paravirt_steal_rq_enabled;
+ 
++void sched_steal_time_cpu_init(int cpu, u64 steal);
++
+ #ifdef CONFIG_HAVE_PV_STEAL_CLOCK_GEN
+ u64 dummy_steal_clock(int cpu);
+ 
+diff --git a/kernel/sched/cputime.c b/kernel/sched/cputime.c
+index fbf31db0d2f3..1490d1bcf3b4 100644
+--- a/kernel/sched/cputime.c
++++ b/kernel/sched/cputime.c
+@@ -255,6 +255,16 @@ void __account_forceidle_time(struct task_struct *p, u64 delta)
+ #ifdef CONFIG_PARAVIRT
+ struct static_key paravirt_steal_enabled;
+ 
++void sched_steal_time_cpu_init(int cpu, u64 steal)
++{
++	struct rq *rq = cpu_rq(cpu);
++
++	rq->prev_steal_time = steal;
++#ifdef CONFIG_PARAVIRT_TIME_ACCOUNTING
++	rq->prev_steal_time_rq = steal;
++#endif
++}
++
+ #ifdef CONFIG_HAVE_PV_STEAL_CLOCK_GEN
+ static u64 native_steal_clock(int cpu)
+ {
+-- 
+2.39.3
+

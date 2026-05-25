@@ -1,0 +1,118 @@
+From 8fc07b9da2ba8b1dd965a9f77afd3812e8fa5ba1 Mon Sep 17 00:00:00 2001
+From: Dongli Zhang <dongli.zhang@oracle.com>
+Date: Thu, 30 Apr 2026 00:06:35 -0700
+Subject: [PATCH 3/5] KVM: x86: account KVM_SET_CLOCK downtime in steal time
+
+The KVM_CLOCK_REALTIME has been introduced to help track the downtime of
+live migration. KVM uses that realtime value to advance guest clock, but
+the same blackout is not reflected in KVM steal time.
+
+Account that same delta in steal time directly in kvm_vm_ioctl_set_clock(),
+only when KVM_CLOCK_REALTIME is used. This keeps the KVM-only solution
+self-contained and avoids adding a new KVM ioctl or requiring additional
+userspace changes (i.e. QEMU).
+
+Record the per-VM downtime delta when KVM_SET_CLOCK receives
+KVM_CLOCK_REALTIME, and fold it into the existing x86 steal accounting
+path. Initialize each vCPU's local cursor
+(vcpu->arch.st.last_downtime_steal) when the guest enables
+MSR_KVM_STEAL_TIME so previously accumulated blackout is not charged.
+
+Note that this means a vCPU may observe additional steal time after
+blackout even if the host side contribution from current->sched_info
+did not increase during that interval.
+
+Signed-off-by: Dongli Zhang <dongli.zhang@oracle.com>
+---
+ arch/x86/include/asm/kvm_host.h |  3 +++
+ arch/x86/kvm/x86.c              | 25 +++++++++++++++++++++++--
+ 2 files changed, 26 insertions(+), 2 deletions(-)
+
+diff --git a/arch/x86/include/asm/kvm_host.h b/arch/x86/include/asm/kvm_host.h
+index 1f1f29128c5d..920441b1abf0 100644
+--- a/arch/x86/include/asm/kvm_host.h
++++ b/arch/x86/include/asm/kvm_host.h
+@@ -959,6 +959,7 @@ struct kvm_vcpu_arch {
+ 		u8 preempted;
+ 		u64 msr_val;
+ 		u64 last_steal;
++		u64 last_downtime_steal;
+ 		struct gfn_to_hva_cache cache;
+ 		bool need_reset;
+ 	} st;
+@@ -1506,6 +1507,8 @@ struct kvm_arch {
+ 	u64 master_kernel_ns;
+ 	u64 master_cycle_now;
+ 
++	atomic64_t downtime_steal;
++
+ #ifdef CONFIG_KVM_HYPERV
+ 	struct kvm_hv hyperv;
+ #endif
+diff --git a/arch/x86/kvm/x86.c b/arch/x86/kvm/x86.c
+index eec578894ad5..452293fc0505 100644
+--- a/arch/x86/kvm/x86.c
++++ b/arch/x86/kvm/x86.c
+@@ -3751,6 +3751,7 @@ static void record_steal_time(struct kvm_vcpu *vcpu)
+ 	struct kvm_steal_time __user *st;
+ 	struct kvm_memslots *slots;
+ 	gpa_t gpa = vcpu->arch.st.msr_val & KVM_STEAL_VALID_BITS;
++	u64 downtime_steal;
+ 	u64 steal;
+ 	u32 version;
+ 
+@@ -3838,6 +3839,11 @@ static void record_steal_time(struct kvm_vcpu *vcpu)
+ 	steal += current->sched_info.run_delay -
+ 		vcpu->arch.st.last_steal;
+ 	vcpu->arch.st.last_steal = current->sched_info.run_delay;
++
++	downtime_steal = atomic64_read(&vcpu->kvm->arch.downtime_steal);
++	steal += downtime_steal - vcpu->arch.st.last_downtime_steal;
++	vcpu->arch.st.last_downtime_steal = downtime_steal;
++
+ 	unsafe_put_user(steal, &st->steal, out);
+ 
+ 	version += 1;
+@@ -4185,6 +4191,9 @@ int kvm_set_msr_common(struct kvm_vcpu *vcpu, struct msr_data *msr_info)
+ 			break;
+ 
+ 		vcpu->arch.st.need_reset = true;
++		vcpu->arch.st.last_downtime_steal =
++			atomic64_read(&vcpu->kvm->arch.downtime_steal);
++
+ 		kvm_make_request(KVM_REQ_STEAL_UPDATE, vcpu);
+ 
+ 		break;
+@@ -7250,8 +7259,18 @@ static int kvm_vm_ioctl_set_clock(struct kvm *kvm, void __user *argp)
+ 		/*
+ 		 * Avoid stepping the kvmclock backwards.
+ 		 */
+-		if (now_real_ns > data.realtime)
+-			data.clock += now_real_ns - data.realtime;
++		if (now_real_ns > data.realtime) {
++			u64 downtime_ns = now_real_ns - data.realtime;
++
++			data.clock += downtime_ns;
++
++			if (sched_info_on()) {
++				atomic64_add(downtime_ns,
++					     &kvm->arch.downtime_steal);
++				kvm_make_all_cpus_request(kvm,
++							  KVM_REQ_STEAL_UPDATE);
++			}
++		}
+ 	}
+ 
+ 	if (ka->use_master_clock)
+@@ -13389,6 +13408,8 @@ int kvm_arch_init_vm(struct kvm *kvm, unsigned long type)
+ 	kvm->arch.hv_root_tdp = INVALID_PAGE;
+ #endif
+ 
++	atomic64_set(&kvm->arch.downtime_steal, 0);
++
+ 	kvm_apicv_init(kvm);
+ 	kvm_hv_init_vm(kvm);
+ 	kvm_xen_init_vm(kvm);
+-- 
+2.39.3
+
