@@ -1,0 +1,57 @@
+From 96f0eb4a949a8930eb44d37f9da859bc247affab Mon Sep 17 00:00:00 2001
+From: Dongli Zhang <dongli.zhang@oracle.com>
+Date: Mon, 8 Jun 2026 08:45:04 -0700
+Subject: [PATCH 1/4] amd_iommu: Do not create duplicate MSI capability
+
+amdvi_pci_realize() manually adds an MSI capability before calling
+msi_init(). msi_init() creates the MSI capability itself, so the device
+can expose duplicate MSI capabilities to the guest.
+
+Drop the manual MSI capability and let msi_init() create the single MSI
+capability used by QEMU.
+
+Otherwise, there are duplicate MSI capabilities in guest VM lspci.
+
+[root@vm ~]# lspci -vvv -s 00:02.0
+00:02.0 IOMMU: Advanced Micro Devices, Inc. [AMD] Family 15h (Models 10h-1fh) I/O Memory Management Unit
+	Subsystem: Red Hat, Inc. Device 1100
+	Control: I/O+ Mem+ BusMaster- SpecCycle- MemWINV- VGASnoop- ParErr- Stepping- SERR+ FastB2B- DisINTx+
+	Status: Cap+ 66MHz- UDF- FastB2B- ParErr- DEVSEL=fast >TAbort- <TAbort- <MAbort- >SERR- <PERR- INTx-
+	Interrupt: pin ? routed to IRQ 24
+	Capabilities: [60] MSI: Enable+ Count=1/1 Maskable- 64bit+
+		Address: 00000000fee02000  Data: 0021
+	Capabilities: [5c] HyperTransport: Slave or Primary Interface
+		Command: BaseUnitID=0 UnitCnt=0 MastHost- DefDir-
+		Link Control 0: CFlE- CST+ CFE- <LkFail- Init- EOC- TXO- <CRCErr=c
+		Link Config 0: MLWI=16bit MLWO=8bit LWI=8bit LWO=8bit
+		Link Control 1: CFlE- CST- CFE- <LkFail- Init- EOC- TXO- <CRCErr=0
+		Link Config 1: MLWI=8bit MLWO=[6] LWI=[6] LWO=N/C
+		Revision ID: 0.00
+	Capabilities: [58] MSI: Enable- Count=1/1 Maskable- 64bit-
+		Address: 00005808  Data: 5c05
+	Capabilities: [40] Secure device <?>
+
+Signed-off-by: Dongli Zhang <dongli.zhang@oracle.com>
+---
+ hw/i386/amd_iommu.c | 5 -----
+ 1 file changed, 5 deletions(-)
+
+diff --git a/hw/i386/amd_iommu.c b/hw/i386/amd_iommu.c
+index 789e09d6f2..997d02eab5 100644
+--- a/hw/i386/amd_iommu.c
++++ b/hw/i386/amd_iommu.c
+@@ -2422,11 +2422,6 @@ static void amdvi_pci_realize(PCIDevice *pdev, Error **errp)
+     }
+     s->capab_offset = ret;
+ 
+-    ret = pci_add_capability(pdev, PCI_CAP_ID_MSI, 0,
+-                             AMDVI_CAPAB_REG_SIZE, errp);
+-    if (ret < 0) {
+-        return;
+-    }
+     ret = pci_add_capability(pdev, PCI_CAP_ID_HT, 0,
+                              AMDVI_CAPAB_REG_SIZE, errp);
+     if (ret < 0) {
+-- 
+2.43.5
+

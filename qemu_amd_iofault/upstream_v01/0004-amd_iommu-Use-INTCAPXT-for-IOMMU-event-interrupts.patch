@@ -1,0 +1,147 @@
+From 2215bc5cdd89b2bd3f9424f07fbfe49286a90b3a Mon Sep 17 00:00:00 2001
+From: Dongli Zhang <dongli.zhang@oracle.com>
+Date: Mon, 8 Jun 2026 08:45:37 -0700
+Subject: [PATCH 4/4] amd_iommu: Use INTCAPXT for IOMMU event interrupts
+
+When xtsup=on is exposed, Linux switches the AMD IOMMU event interrupt
+setup to x2APIC mode and programs the INTCAPXT event register instead
+of relying on the PCI MSI capability.
+
+QEMU currently neither records writes to the INTCAPXT event register nor
+uses the programmed event vector when raising an AMD IOMMU event interrupt.
+As a result, DMA faults can be logged into the event log without
+delivering the AMD-Vi event interrupt to the guest when xtsup=on.
+
+Add the INTCAPXT event MMIO offset and accept guest writes to it. When
+IntCapXT is enabled, build the AMD-Vi event interrupt MSI message from
+the programmed INTCAPXT event register; otherwise keep the existing PCI
+MSI fallback.
+
+This patch intentionally only supports the INTCAPXT event interrupt path.
+It does not add PPR or GA-log interrupt support.
+
+Keep command completion wait interrupts on the existing PCI MSI path by
+using a separate event interrupt helper for INTCAPXT delivery.
+
+Send INTCAPXT event interrupts through the APIC MSI delivery hook so
+KVM can handle x2APIC destination IDs above 255.
+
+Signed-off-by: Dongli Zhang <dongli.zhang@oracle.com>
+---
+ hw/i386/amd_iommu.c | 50 +++++++++++++++++++++++++++++++++++++++------
+ hw/i386/amd_iommu.h |  2 ++
+ 2 files changed, 46 insertions(+), 6 deletions(-)
+
+diff --git a/hw/i386/amd_iommu.c b/hw/i386/amd_iommu.c
+index 996c154a3f..17485aa27f 100644
+--- a/hw/i386/amd_iommu.c
++++ b/hw/i386/amd_iommu.c
+@@ -220,18 +220,53 @@ static void amdvi_assign_andq(AMDVIState *s, hwaddr addr, uint64_t val)
+    amdvi_writeq_raw(s, addr, amdvi_readq(s, addr) & val);
+ }
+ 
+-static void amdvi_generate_msi_interrupt(AMDVIState *s)
++static void amdvi_send_msi_message(AMDVIState *s, MSIMessage msg)
+ {
+-    MSIMessage msg = {};
+     MemTxAttrs attrs = {
+         .requester_id = pci_requester_id(&s->pci->dev)
+     };
+ 
++    address_space_stl_le(&address_space_memory, msg.address, msg.data,
++                         attrs, NULL);
++}
++
++static void amdvi_generate_msi_interrupt(AMDVIState *s)
++{
++    MSIMessage msg;
++
+     if (msi_enabled(&s->pci->dev)) {
+         msg = msi_get_message(&s->pci->dev, 0);
+-        address_space_stl_le(&address_space_memory, msg.address, msg.data,
+-                             attrs, NULL);
++        amdvi_send_msi_message(s, msg);
++    }
++}
++
++static void amdvi_generate_event_interrupt(AMDVIState *s)
++{
++    uint64_t intcapxt;
++    uint64_t control;
++    MSIMessage msg;
++
++    control = amdvi_readq(s, AMDVI_MMIO_CONTROL);
++    if (!s->xtsup || !(control & AMDVI_MMIO_CONTROL_INTCAPXTEN)) {
++        amdvi_generate_msi_interrupt(s);
++        return;
++    }
++
++    intcapxt = amdvi_readq(s, AMDVI_MMIO_INTCAPXT_EVT);
++    if (!intcapxt) {
++        return;
+     }
++
++    X86IOMMUIrq irq = {
++        .delivery_mode = AMDVI_IOAPIC_INT_TYPE_FIXED,
++        .vector = extract64(intcapxt, 32, 8),
++        .dest = extract64(intcapxt, 8, 24) |
++                (extract64(intcapxt, 56, 8) << 24),
++        .dest_mode = extract64(intcapxt, 2, 1),
++    };
++
++    x86_iommu_irq_to_msi_message(&irq, &msg);
++    apic_get_class(NULL)->send_msi(&msg);
+ }
+ 
+ static uint32_t get_next_eventlog_entry(AMDVIState *s)
+@@ -257,7 +292,7 @@ static void amdvi_log_event(AMDVIState *s, uint64_t *evt)
+         /* generate overflow interrupt */
+         if (s->evtlog_intr) {
+             amdvi_assign_orq(s, AMDVI_MMIO_STATUS, AMDVI_MMIO_STATUS_EVT_OVF);
+-            amdvi_generate_msi_interrupt(s);
++            amdvi_generate_event_interrupt(s);
+         }
+         return;
+     }
+@@ -272,7 +307,7 @@ static void amdvi_log_event(AMDVIState *s, uint64_t *evt)
+ 
+     if (s->evtlog_intr) {
+         amdvi_assign_orq(s, AMDVI_MMIO_STATUS, AMDVI_MMIO_STATUS_EVENT_INT);
+-        amdvi_generate_msi_interrupt(s);
++        amdvi_generate_event_interrupt(s);
+     }
+ }
+ 
+@@ -1740,6 +1775,9 @@ static void amdvi_mmio_write(void *opaque, hwaddr addr, uint64_t val,
+         amdvi_mmio_reg_write(s, size, val, addr);
+         amdvi_handle_excllim_write(s);
+         break;
++    case AMDVI_MMIO_INTCAPXT_EVT:
++        amdvi_mmio_reg_write(s, size, val, addr);
++        break;
+         /* PPR log base - unused for now */
+     case AMDVI_MMIO_PPR_BASE:
+         amdvi_mmio_reg_write(s, size, val, addr);
+diff --git a/hw/i386/amd_iommu.h b/hw/i386/amd_iommu.h
+index 0b2e8d207b..7e829ccaa2 100644
+--- a/hw/i386/amd_iommu.h
++++ b/hw/i386/amd_iommu.h
+@@ -57,6 +57,7 @@
+ #define AMDVI_MMIO_EXCL_BASE          0x0020
+ #define AMDVI_MMIO_EXCL_LIMIT         0x0028
+ #define AMDVI_MMIO_EXT_FEATURES       0x0030
++#define AMDVI_MMIO_INTCAPXT_EVT       0x0170
+ #define AMDVI_MMIO_COMMAND_HEAD       0x2000
+ #define AMDVI_MMIO_COMMAND_TAIL       0x2008
+ #define AMDVI_MMIO_EVENT_HEAD         0x2010
+@@ -106,6 +107,7 @@
+ #define AMDVI_MMIO_CONTROL_COMWAITINTEN   (1ULL << 4)
+ #define AMDVI_MMIO_CONTROL_CMDBUFLEN      (1ULL << 12)
+ #define AMDVI_MMIO_CONTROL_GAEN           (1ULL << 17)
++#define AMDVI_MMIO_CONTROL_INTCAPXTEN     (1ULL << 51)
+ 
+ /* MMIO status register bits */
+ #define AMDVI_MMIO_STATUS_CMDBUF_RUN  (1 << 4)
+-- 
+2.43.5
+
