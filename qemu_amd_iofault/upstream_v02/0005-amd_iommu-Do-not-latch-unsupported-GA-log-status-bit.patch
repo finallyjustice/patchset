@@ -1,0 +1,74 @@
+From 897c3630fd709906bdbd6c4d37a07a604235ca16 Mon Sep 17 00:00:00 2001
+From: Dongli Zhang <dongli.zhang@oracle.com>
+Date: Fri, 24 Jul 2026 11:47:38 -0700
+Subject: [PATCH v2 5/5] amd_iommu: Do not latch unsupported GA log status bits
+
+When QEMU records an AMD-Vi event-log entry for an IO page fault, it
+sets the event interrupt status bit and injects the event interrupt.
+
+Linux kernel prior to commit 2379f3485239 ("iommu/amd: Refactor IOMMU
+interrupt handling logic for Event, PPR, and GA logs") clears the status
+register with a combined mask AMD_IOMMU_INT_MASK when handling any IOMMU
+interrupt. That mask includes the
+GA log interrupt (MMIO_STATUS_GALOG_INT_MASK) and
+overflow (MMIO_STATUS_GALOG_OVERFLOW_MASK) bits, even when the interrupt
+being handled is only an event-log interrupt.
+
+QEMU does not produce GA log entries or set GA log status. However, the
+emulated status register still accepts guest writes to the GA log status
+bits as normal writes. As a result, a guest status clear write that
+includes those bits can latch a spurious GA log overflow. The guest then
+observes GA log status that QEMU did not generate and repeatedly
+restarts the GA log.
+
+The below guest dmesg logs are from v6.4 Linux kernel.
+
+[   57.818224] virtio-pci 0000:01:00.0: AMD-Vi: Event logged [IO_PAGE_FAULT domain=0x0000 address=0xc0000000 flags=0x0009]
+[   57.821130] virtio-pci 0000:01:00.0: AMD-Vi: Event logged [IO_PAGE_FAULT domain=0x0000 address=0xc0000000 flags=0x0009]
+[   57.824003] AMD-Vi: IOMMU GA Log overflow
+[   57.825099] AMD-Vi: IOMMU GA Log restarting
+[   57.826338] AMD-Vi: IOMMU GA Log overflow
+[   57.827425] AMD-Vi: IOMMU GA Log restarting
+[   57.828657] AMD-Vi: IOMMU GA Log overflow
+[   57.829758] AMD-Vi: IOMMU GA Log restarting
+[   57.830986] AMD-Vi: IOMMU GA Log overflow
+[   57.832063] AMD-Vi: IOMMU GA Log restarting
+
+Mainline Linux commit 2379f3485239 ("iommu/amd: Refactor IOMMU interrupt
+handling logic for Event, PPR, and GA logs") avoids triggering this by
+chance by clearing only the status bits for the log being handled. However,
+older guests still use the combined clear mask.
+
+Add the GA log interrupt and overflow bits to the AMDVI_MMIO_STATUS
+w1cmask so guest writes cannot create unsupported GA log status. This
+does not implement GA log production. It only prevents guest status clear
+writes from creating GA log status that QEMU did not generate to
+emulated IO page fault for guest Linux kernel.
+
+Fixes: 12499b23315b ("x86_iommu/amd: Enable Guest virtual APIC support")
+Signed-off-by: Dongli Zhang <dongli.zhang@oracle.com>
+---
+v1->v2:
+  - As the previous commit replaced the hardcoded value 0x67 with a macro,
+    update the macro instead of the hardcoded value used by amdvi_init().
+
+ hw/i386/amd_iommu.h | 3 ++-
+ 1 file changed, 2 insertions(+), 1 deletion(-)
+
+diff --git a/hw/i386/amd_iommu.h b/hw/i386/amd_iommu.h
+index 9cd510d790..4932568a0f 100644
+--- a/hw/i386/amd_iommu.h
++++ b/hw/i386/amd_iommu.h
+@@ -125,7 +125,8 @@
+ #define AMDVI_MMIO_STATUS_W1C_MASK \
+     (AMDVI_MMIO_STATUS_EVT_OVF | AMDVI_MMIO_STATUS_EVENT_INT | \
+      AMDVI_MMIO_STATUS_COMP_INT | AMDVI_MMIO_STATUS_PPR_OVF | \
+-     AMDVI_MMIO_STATUS_PPR_INT)
++     AMDVI_MMIO_STATUS_PPR_INT | AMDVI_MMIO_STATUS_GALOG_OVF | \
++     AMDVI_MMIO_STATUS_GALOG_INT)
+ 
+ #define AMDVI_CMDBUF_ID_BYTE              0x07
+ #define AMDVI_CMDBUF_ID_RSHIFT            4
+-- 
+2.39.3
+

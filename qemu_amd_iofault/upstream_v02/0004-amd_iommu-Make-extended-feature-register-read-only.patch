@@ -1,0 +1,41 @@
+From dbca9af0edee3bc02dff7eebacdf90320f840c7d Mon Sep 17 00:00:00 2001
+From: Dongli Zhang <dongli.zhang@oracle.com>
+Date: Fri, 24 Jul 2026 11:27:23 -0700
+Subject: [PATCH v2 4/5] amd_iommu: Make extended feature register read-only
+
+AMDVI_MMIO_EXT_FEATURES is populated from QEMU's advertised AMD-Vi
+extended feature set during reset. Guest writes to this register do not
+enable or disable any corresponding QEMU emulation behavior.
+
+The current mask leaves bit 4 writable, which only allows the guest to
+modify the stored feature value without changing the device model. Make
+the register fully read-only so the visible feature bits remain controlled
+by QEMU.
+
+According to the AMD IOMMU SDM, bits 25:24 (DualPprLogSup),
+29:28 (DualEventLogSup), and 37 (USSup) are not specified as RO.
+This commit modifies only bit 4 (GTSup), while leaving the rest as they
+are.
+
+Suggested-by: Sairaj Kodilkar <sarunkod@amd.com>
+Signed-off-by: Dongli Zhang <dongli.zhang@oracle.com>
+---
+ hw/i386/amd_iommu.h | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/hw/i386/amd_iommu.h b/hw/i386/amd_iommu.h
+index f86e37fe93..9cd510d790 100644
+--- a/hw/i386/amd_iommu.h
++++ b/hw/i386/amd_iommu.h
+@@ -241,7 +241,7 @@
+         AMDVI_FEATURE_IA | AMDVI_FEATURE_GT | AMDVI_FEATURE_HE | \
+         AMDVI_GATS_MODE | AMDVI_HATS_MODE | AMDVI_FEATURE_GA)
+ 
+-#define AMDVI_MMIO_EXT_FEATURE_RO_MASK 0xffffffffffffffefULL
++#define AMDVI_MMIO_EXT_FEATURE_RO_MASK (~0ULL)
+ 
+ /* capabilities header */
+ #define AMDVI_CAPAB_FEATURES (AMDVI_CAPAB_FLAT_EXT | \
+-- 
+2.39.3
+

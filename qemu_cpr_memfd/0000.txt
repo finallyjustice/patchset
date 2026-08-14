@@ -1,0 +1,65 @@
+[PATCH 0/5] Support diskless memfd transport for cpr-exec
+
+Currently, cpr-exec requires a file to save and load VM/device state.
+
+Introduce a diskless approach so cpr-exec no longer relies on disk storage
+for this state. The main idea is to add a new memfd-based migration
+transport: instead of using a file, VM/device state is saved to and loaded
+from an inherited memfd.
+
+I tested this with virtio-blk, NVMe VFIO, and virtio-net.
+
+/home/opc/ext4/qemu/build/qemu-system-x86_64 \
+-machine q35,dump-guest-core=off,memory-backend=ram0,aux-ram-share=on \
+-accel kvm -cpu host \
+-name debug-threads=on \
+-m 8G -smp 4 \
+-object memory-backend-memfd,id=ram0,size=8G,share=on \
+-device virtio-blk-pci,drive=drive0,id=virtblk0,num-queues=4 \
+-drive file=ol89.qcow2,if=none,id=drive0 \
+-object iommufd,id=iommufd0 \
+-device vfio-pci,host=0000:82:00.0,iommufd=iommufd0,id=vfio0,x-no-mmap=on \
+-device virtio-net-pci,netdev=tapnet,mq=true,vectors=9,mac=52:54:11:22:14:49 \
+-netdev tap,id=tapnet,script=qemu-ifup,downscript=no,queues=2,vhost=off \
+-vnc :8 -monitor stdio
+
+(qemu) migrate_set_parameter mode cpr-exec
+
+(qemu) migrate_set_parameter cpr-exec-command /home/opc/ext4/qemu/build/qemu-system-x86_64 -machine q35,dump-guest-core=off,memory-backend=ram0,aux-ram-share=on -accel kvm -cpu host -name debug-threads=on -m 8G -smp 4 -object memory-backend-memfd,id=ram0,size=8G,share=on -device virtio-blk-pci,drive=drive0,id=virtblk0,num-queues=4 -drive file=ol89.qcow2,if=none,id=drive0 -object iommufd,id=iommufd0 -device vfio-pci,host=0000:82:00.0,iommufd=iommufd0,id=vfio0,x-no-mmap=on -device virtio-net-pci,netdev=tapnet,mq=true,vectors=9,mac=52:54:11:22:14:49 -netdev tap,id=tapnet,script=qemu-ifup,downscript=no,queues=2,vhost=off -vnc :8 -monitor stdio -incoming defer
+
+(qemu) migrate -d memfd:
+QEMU 11.1.50 monitor - type 'help' for more information
+
+(qemu) info status
+VM status: paused (inmigrate)
+
+(qemu) migrate_incoming memfd:
+
+(qemu) info status
+VM status: running
+
+
+Dongli Zhang (5):
+  migration/qapi: Add memfd migration transport
+  migration: Add generic memfd channel helpers
+  migration/cpr-exec: Add memfd helpers
+  migration/cpr-exec: Support diskless memfd transport
+  migration: cpr-exec memfd transport documentation
+
+ docs/devel/migration/CPR.rst | 24 +++++++++++
+ migration/channel.c          |  7 +++
+ migration/cpr-exec-memfd.c   | 90 +++++++++++++++++++++++++++++++++++++++
+ migration/cpr-exec-memfd.h   | 18 ++++++++
+ migration/cpr-exec.c         |  9 ++++
+ migration/memfd.c            | 90 +++++++++++++++++++++++++++++++++++++++
+ migration/memfd.h            | 19 +++++++++
+ migration/meson.build        |  2 +
+ migration/migration.c        |  9 ++++
+ qapi/migration.json          | 32 +++++++++++---
+ 10 files changed, 295 insertions(+), 5 deletions(-)
+
+base-commit: e8d693e12af9cbb89d724baadfcc08559669e279
+
+Thank you very much!
+
+Dongli Zhang

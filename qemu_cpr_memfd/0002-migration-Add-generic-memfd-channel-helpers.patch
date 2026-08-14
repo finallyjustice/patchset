@@ -1,0 +1,129 @@
+From ebae81b3863c4d092b3f1515e788c247599c698e Mon Sep 17 00:00:00 2001
+From: Dongli Zhang <dongli.zhang@oracle.com>
+Date: Tue, 11 Aug 2026 19:07:16 +0000
+Subject: [PATCH 2/5] migration: Add generic memfd channel helpers
+
+Add helpers for creating an outgoing memfd-backed migration channel and for
+wrapping an existing memfd fd as an incoming migration channel. The
+outgoing helper can optionally duplicate the memfd fd for the caller.
+
+Signed-off-by: Dongli Zhang <dongli.zhang@oracle.com>
+---
+ migration/memfd.c     | 67 +++++++++++++++++++++++++++++++++++++++++++
+ migration/memfd.h     | 17 +++++++++++
+ migration/meson.build |  1 +
+ 3 files changed, 85 insertions(+)
+ create mode 100644 migration/memfd.c
+ create mode 100644 migration/memfd.h
+
+diff --git a/migration/memfd.c b/migration/memfd.c
+new file mode 100644
+index 0000000000..0b5ef0234f
+--- /dev/null
++++ b/migration/memfd.c
+@@ -0,0 +1,67 @@
++// SPDX-License-Identifier: GPL-2.0-or-later
++/*
++ * QEMU live migration via memfd
++ *
++ * Copyright (c) 2026 Oracle and/or its affiliates.
++ */
++
++#include "qemu/osdep.h"
++#include "qapi/error.h"
++#include "qemu/cutils.h"
++#include "qemu/memfd.h"
++#include "memfd.h"
++
++QIOChannel *memfd_create_outgoing(const char *name, int *dup_fdp,
++                                  Error **errp)
++{
++    QIOChannelFile *fioc;
++    QIOChannel *ioc;
++    int fd;
++
++#ifdef CONFIG_LINUX
++    fd = qemu_memfd_create(name, 0, false, 0, 0, errp);
++#else
++    fd = -1;
++    error_setg(errp, "memfd migration is only supported on Linux");
++#endif
++
++    if (fd < 0) {
++        return NULL;
++    }
++
++    if (dup_fdp) {
++        int dup_fd = dup(fd);
++
++        if (dup_fd < 0) {
++            error_setg_errno(errp, errno,
++                             "failed to duplicate memfd migration fd");
++            close(fd);
++            return NULL;
++        }
++
++        qemu_set_cloexec(dup_fd);
++        *dup_fdp = dup_fd;
++    }
++
++    fioc = qio_channel_file_new_fd(fd);
++    ioc = QIO_CHANNEL(fioc);
++    qio_channel_set_name(ioc, name);
++    return ioc;
++}
++
++QIOChannel *memfd_open_incoming(int fd, const char *name, Error **errp)
++{
++    QIOChannelFile *fioc;
++    QIOChannel *ioc;
++
++    if (lseek(fd, 0, SEEK_SET) < 0) {
++        error_setg_errno(errp, errno, "failed to rewind memfd migration fd");
++        close(fd);
++        return NULL;
++    }
++
++    fioc = qio_channel_file_new_fd(fd);
++    ioc = QIO_CHANNEL(fioc);
++    qio_channel_set_name(ioc, name);
++    return ioc;
++}
+diff --git a/migration/memfd.h b/migration/memfd.h
+new file mode 100644
+index 0000000000..cb6afe3eeb
+--- /dev/null
++++ b/migration/memfd.h
+@@ -0,0 +1,17 @@
++// SPDX-License-Identifier: GPL-2.0-or-later
++/*
++ * QEMU live migration via memfd
++ *
++ * Copyright (c) 2026 Oracle and/or its affiliates.
++ */
++
++#ifndef QEMU_MIGRATION_MEMFD_H
++#define QEMU_MIGRATION_MEMFD_H
++
++#include "io/channel-file.h"
++
++QIOChannel *memfd_create_outgoing(const char *name, int *dup_fdp,
++                                  Error **errp);
++QIOChannel *memfd_open_incoming(int fd, const char *name, Error **errp);
++
++#endif
+diff --git a/migration/meson.build b/migration/meson.build
+index 0a9a5d0d37..1d852b8c6d 100644
+--- a/migration/meson.build
++++ b/migration/meson.build
+@@ -23,6 +23,7 @@ system_ss.add(files(
+   'fd.c',
+   'file.c',
+   'global_state.c',
++  'memfd.c',
+   'migration.c',
+   'multifd.c',
+   'multifd-device-state.c',
+-- 
+2.43.5
+

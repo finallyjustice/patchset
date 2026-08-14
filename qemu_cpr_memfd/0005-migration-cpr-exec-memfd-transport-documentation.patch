@@ -1,0 +1,59 @@
+From 2de6cb40025db5eb655fa7e29a143820fa6ed115 Mon Sep 17 00:00:00 2001
+From: Dongli Zhang <dongli.zhang@oracle.com>
+Date: Wed, 12 Aug 2026 03:15:52 -0700
+Subject: [PATCH 5/5] migration: cpr-exec memfd transport documentation
+
+Document the cpr-exec flow using the memfd migration transport. The example
+keeps migrate_incoming explicit so the command sequence mirrors the
+existing deferred incoming flow.
+
+Signed-off-by: Dongli Zhang <dongli.zhang@oracle.com>
+---
+ docs/devel/migration/CPR.rst | 24 ++++++++++++++++++++++++
+ 1 file changed, 24 insertions(+)
+
+diff --git a/docs/devel/migration/CPR.rst b/docs/devel/migration/CPR.rst
+index b6178568a8..8afc83a08d 100644
+--- a/docs/devel/migration/CPR.rst
++++ b/docs/devel/migration/CPR.rst
+@@ -369,6 +369,10 @@ Outgoing:
+     a ``file`` type, but one can use other types such as ``exec``,
+     provided the command captures all the data from the outgoing side,
+     and provides all the data to the incoming side.
++  * Alternatively, use the ``memfd:`` URI to save VM/device state
++    to an internal memfd inherited by the new QEMU.  The new QEMU may
++    use ``-incoming memfd:`` to load it automatically, or ``-incoming
++    defer`` to load it later with ``migrate_incoming memfd:``.
+ 
+ Incoming:
+   * You do not need to explicitly start new QEMU.  It is started as
+@@ -424,6 +428,26 @@ Example 2: incoming defer
+   (qemu) info status
+   VM status: running
+ 
++Example 3: main state memfd
++^^^^^^^^^^^^^^^^^^^^^^^^^^^
++::
++
++  # qemu-kvm -monitor stdio
++  -machine q35,memory-backend=ram0,aux-ram-share=on
++  -object memory-backend-memfd,id=ram0,size=8G,share=on
++  ... ...
++
++  QEMU 11.1.50 monitor - type 'help' for more information
++  (qemu) migrate_set_parameter mode cpr-exec
++  (qemu) migrate_set_parameter cpr-exec-command qemu-kvm ... -incoming defer
++  (qemu) migrate -d memfd:
++  QEMU 11.1.50 monitor - type 'help' for more information
++  (qemu) info status
++  VM status: paused (inmigrate)
++  (qemu) migrate_incoming memfd:
++  (qemu) info status
++  VM status: running
++
+ Caveats
+ ^^^^^^^
+ 
+-- 
+2.43.5
+
