@@ -1,0 +1,69 @@
+From cd200d284345442ca219b8a0afc3256e83e48813 Mon Sep 17 00:00:00 2001
+From: Dongli Zhang <dongli.zhang@oracle.com>
+Date: Sat, 15 Aug 2026 19:04:10 -0700
+Subject: [PATCH 2/4] KVM: arm64: Reset last_steal on vCPU pid change
+
+The previous commit resets x86 steal time accounting when the vCPU PID is
+changed. Do the same for arm64.
+
+KVM keeps a vCPU fd alive when userspace hot-unplugs a vCPU. If the fd is
+later reused from a new vCPU thread, vcpu->arch.steal.last_steal still
+reflects the old task's run_delay, while current->sched_info.run_delay
+belongs to the new task.
+
+Reset vcpu->arch.steal.last_steal from kvm_arch_vcpu_run_pid_change()
+unconditionally so the next stolen time update computes its delta against
+the new task's run_delay.
+
+Assisted-by: Codex:GPT-5.5
+Signed-off-by: Dongli Zhang <dongli.zhang@oracle.com>
+---
+ arch/arm64/include/asm/kvm_host.h | 1 +
+ arch/arm64/kvm/arm.c              | 2 ++
+ arch/arm64/kvm/pvtime.c           | 5 +++++
+ 3 files changed, 8 insertions(+)
+
+diff --git a/arch/arm64/include/asm/kvm_host.h b/arch/arm64/include/asm/kvm_host.h
+index bae2c4f92ef5..4607f956e787 100644
+--- a/arch/arm64/include/asm/kvm_host.h
++++ b/arch/arm64/include/asm/kvm_host.h
+@@ -1339,6 +1339,7 @@ static inline bool kvm_arch_pmi_in_guest(struct kvm_vcpu *vcpu)
+ long kvm_hypercall_pv_features(struct kvm_vcpu *vcpu);
+ gpa_t kvm_init_stolen_time(struct kvm_vcpu *vcpu);
+ void kvm_update_stolen_time(struct kvm_vcpu *vcpu);
++void kvm_reset_stolen_time(struct kvm_vcpu *vcpu);
+ 
+ bool kvm_arm_pvtime_supported(void);
+ int kvm_arm_pvtime_set_attr(struct kvm_vcpu *vcpu,
+diff --git a/arch/arm64/kvm/arm.c b/arch/arm64/kvm/arm.c
+index 9a6c72a18672..0f6e63eace21 100644
+--- a/arch/arm64/kvm/arm.c
++++ b/arch/arm64/kvm/arm.c
+@@ -929,6 +929,8 @@ int kvm_arch_vcpu_run_pid_change(struct kvm_vcpu *vcpu)
+ 	if (!kvm_arm_vcpu_is_finalized(vcpu))
+ 		return -EPERM;
+ 
++	kvm_reset_stolen_time(vcpu);
++
+ 	if (likely(vcpu_has_run_once(vcpu)))
+ 		return 0;
+ 
+diff --git a/arch/arm64/kvm/pvtime.c b/arch/arm64/kvm/pvtime.c
+index 4ceabaa4c30b..000bf49cc0fd 100644
+--- a/arch/arm64/kvm/pvtime.c
++++ b/arch/arm64/kvm/pvtime.c
+@@ -32,6 +32,11 @@ void kvm_update_stolen_time(struct kvm_vcpu *vcpu)
+ 	srcu_read_unlock(&kvm->srcu, idx);
+ }
+ 
++void kvm_reset_stolen_time(struct kvm_vcpu *vcpu)
++{
++	vcpu->arch.steal.last_steal = current->sched_info.run_delay;
++}
++
+ long kvm_hypercall_pv_features(struct kvm_vcpu *vcpu)
+ {
+ 	u32 feature = smccc_get_arg1(vcpu);
+-- 
+2.43.5
+

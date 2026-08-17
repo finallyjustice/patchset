@@ -1,0 +1,89 @@
+[PATCH 0/4] KVM: Reset steal time accounting on vCPU pid change (x86 and arm64)
+
+I previously sent the patchset below, but I am not sending this series as
+v2 because the topic has changed significantly.
+
+[PATCH 0/5] Fix and enhance KVM steal accounting for both guest and host
+https://lore.kernel.org/all/20260505003044.78693-1-dongli.zhang@oracle.com
+
+KVM does not support vCPU hotplug. When a vCPU is removed, its
+corresponding data structures are not freed by KVM. Instead, QEMU destroys
+only the userspace state and the vCPU thread, while the KVM vCPU fd remains
+open and parked in QEMU.
+
+As a result, vcpu->arch.st.last_steal is not reset. If the same vCPU is
+later re-created by QEMU, last_steal retains its old value, while
+current->sched_info.run_delay starts from zero since a new vCPU thread is
+created. This causes current->sched_info.run_delay - vcpu->arch.st.last_steal
+to produce a large, bogus value.
+
+For instance, current->sched_info.run_delay can become smaller than
+vcpu->arch.st.last_steal (see line 3804) if a QEMU vCPU is re-added after
+it has previously been removed.
+
+As a result, st->steal restarts from a very small value, close to
+current->sched_info.run_delay.
+
+3720 static void record_steal_time(struct kvm_vcpu *vcpu)
+3721 {
+... ...
+3803         unsafe_get_user(steal, &st->steal, out);
+3804         steal += current->sched_info.run_delay -
+3805                 vcpu->arch.st.last_steal;
+3806         vcpu->arch.st.last_steal = current->sched_info.run_delay;
+3807         unsafe_put_user(steal, &st->steal, out);
+
+
+This patchset:
+
+1. Resets vcpu->arch.st.last_steal when the vCPU PID changes, as suggested
+by Sean. Both x86 and arm64 are supported.
+
+2. Although David suggested accounting the run_delay left over from the
+previous vCPU PID, this series does not do that. It would be easy to make
+that work if KVM could simply assume every transition is a vCPU PID change.
+In practice, KVM does not always have enough information about the previous
+vCPU PID, e.g. after live migration, unless a new ioctl is introduced. For
+now, this series simply resets last_steal.
+
+3. Although David also suggested doing the same for Xen-on-KVM vCPUs, this
+series does not reset last_steal for Xen vCPUs. That change itself would
+not be difficult, but Xen uses a different mechanism to account downtime,
+including runnable time and offline time when a vCPU is not running. It may
+therefore need no additional ioctl, or a smaller ioctl extension, to account
+run_delay left over from the previous PID. For now, this series changes only
+regular x86 steal time and arm64 PV time.
+
+4. Guest kernel changes are not included. I may send it separately to keep
+this series limited to the KVM hypervisor.
+
+[PATCH 1/5] x86/kvm: Reset prev_steal_time and prev_steal_time_rq when enabling steal time
+https://lore.kernel.org/all/20260505003044.78693-2-dongli.zhang@oracle.com
+
+5. There is one remaining corner case: this series resets last_steal when
+the vCPU run PID changes, but not when steal time is enabled. If additional
+host run_delay is accumulated after the PID changes but before the guest
+enables steal time, that delta could be unexpectedly accounted to guest
+vCPU steal time. In practice, this should not happen for Linux guests.
+
+
+Dongli Zhang (4)
+  KVM: x86: Reset last_steal on vCPU pid change
+  KVM: arm64: Reset last_steal on vCPU pid change
+  KVM: selftests: Test steal time across vCPU pid changes on x86
+  KVM: selftests: Add arm64 coverage for steal time pid changes
+
+ arch/arm64/include/asm/kvm_host.h               |   1 +
+ arch/arm64/kvm/arm.c                            |   2 +
+ arch/arm64/kvm/pvtime.c                         |   5 +
+ arch/x86/kvm/Kconfig                            |   1 +
+ arch/x86/kvm/x86.c                              |   7 +
+ tools/testing/selftests/kvm/Makefile.kvm        |   2 +
+ .../selftests/kvm/steal_time_change_pid.c       | 216 +++++++++++++++++++
+ 7 files changed, 234 insertions(+)
+
+base-commit: 3eb40771c00a8488fa6ed2cc1fe203477908bf38
+
+Thank you very much!
+
+Dongli Zhang

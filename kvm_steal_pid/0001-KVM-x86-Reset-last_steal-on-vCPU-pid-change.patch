@@ -1,0 +1,61 @@
+From 2a46517fa0ce783ef4ae6a5a05f5cf3e07c79f8e Mon Sep 17 00:00:00 2001
+From: Dongli Zhang <dongli.zhang@oracle.com>
+Date: Sat, 15 Aug 2026 22:00:49 +0000
+Subject: [PATCH 1/4] KVM: x86: Reset last_steal on vCPU pid change
+
+KVM does not support vCPU hotplug. When a vCPU is removed, its
+corresponding data structures are not freed by KVM. Instead, QEMU destroys
+only the userspace state and the vCPU thread, while the KVM vCPU fd remains
+open and parked in QEMU.
+
+As a result, vcpu->arch.st.last_steal is not reset.
+
+If the same vCPU is later re-created by QEMU, last_steal retains its old
+value, while current->sched_info.run_delay starts from zero since a new
+vCPU thread is created. This causes
+current->sched_info.run_delay - vcpu->arch.st.last_steal to produce a
+large, bogus value.
+
+Fix this by resetting vcpu->arch.st.last_steal unconditionally to
+current->sched_info.run_delay when KVM vCPU PID is changed.
+
+Assisted-by: Codex:GPT-5.5
+Signed-off-by: Dongli Zhang <dongli.zhang@oracle.com>
+---
+ arch/x86/kvm/Kconfig | 1 +
+ arch/x86/kvm/x86.c   | 7 +++++++
+ 2 files changed, 8 insertions(+)
+
+diff --git a/arch/x86/kvm/Kconfig b/arch/x86/kvm/Kconfig
+index 801bf9e520db..b7cb2ceda6d9 100644
+--- a/arch/x86/kvm/Kconfig
++++ b/arch/x86/kvm/Kconfig
+@@ -40,6 +40,7 @@ config KVM_X86
+ 	select HAVE_KVM_MSI
+ 	select HAVE_KVM_CPU_RELAX_INTERCEPT
+ 	select HAVE_KVM_NO_POLL
++	select HAVE_KVM_VCPU_RUN_PID_CHANGE
+ 	select VIRT_XFER_TO_GUEST_WORK
+ 	select KVM_GENERIC_DIRTYLOG_READ_PROTECT
+ 	select KVM_VFIO
+diff --git a/arch/x86/kvm/x86.c b/arch/x86/kvm/x86.c
+index 47cb9eba113b..33be45eec32b 100644
+--- a/arch/x86/kvm/x86.c
++++ b/arch/x86/kvm/x86.c
+@@ -3717,6 +3717,13 @@ void kvm_service_local_tlb_flush_requests(struct kvm_vcpu *vcpu)
+ }
+ EXPORT_SYMBOL_FOR_KVM_INTERNAL(kvm_service_local_tlb_flush_requests);
+ 
++int kvm_arch_vcpu_run_pid_change(struct kvm_vcpu *vcpu)
++{
++	vcpu->arch.st.last_steal = current->sched_info.run_delay;
++
++	return 0;
++}
++
+ static void record_steal_time(struct kvm_vcpu *vcpu)
+ {
+ 	struct gfn_to_hva_cache *ghc = &vcpu->arch.st.cache;
+-- 
+2.43.5
+

@@ -1,0 +1,100 @@
+From 1c26a4b1327ac0ef2f65428bebdb19fde3263690 Mon Sep 17 00:00:00 2001
+From: Dongli Zhang <dongli.zhang@oracle.com>
+Date: Sat, 15 Aug 2026 18:26:26 -0700
+Subject: [PATCH 4/4] KVM: selftests: Add arm64 coverage for steal time pid
+ changes
+
+The previous patch added the common steal_time_change_pid test with x86
+support. Add the arm64 support so the same test also covers arm64.
+
+Use KVM_ARM_VCPU_PVTIME_IPA to enable the steal time shared page from
+userspace, and use the PV_TIME_ST SMCCC call in the guest to retrieve and
+read that page.
+
+Assisted-by: Codex:GPT-5.5
+Signed-off-by: Dongli Zhang <dongli.zhang@oracle.com>
+---
+ tools/testing/selftests/kvm/Makefile.kvm      |  1 +
+ .../selftests/kvm/steal_time_change_pid.c     | 54 +++++++++++++++++++
+ 2 files changed, 55 insertions(+)
+
+diff --git a/tools/testing/selftests/kvm/Makefile.kvm b/tools/testing/selftests/kvm/Makefile.kvm
+index c8ce17851561..b01a3403d602 100644
+--- a/tools/testing/selftests/kvm/Makefile.kvm
++++ b/tools/testing/selftests/kvm/Makefile.kvm
+@@ -199,6 +199,7 @@ TEST_GEN_PROGS_arm64 += guest_memfd_test
+ TEST_GEN_PROGS_arm64 += mmu_stress_test
+ TEST_GEN_PROGS_arm64 += rseq_test
+ TEST_GEN_PROGS_arm64 += steal_time
++TEST_GEN_PROGS_arm64 += steal_time_change_pid
+ 
+ TEST_GEN_PROGS_s390 = $(TEST_GEN_PROGS_COMMON)
+ TEST_GEN_PROGS_s390 += s390/memop
+diff --git a/tools/testing/selftests/kvm/steal_time_change_pid.c b/tools/testing/selftests/kvm/steal_time_change_pid.c
+index 3c39594db398..12d4927d1c01 100644
+--- a/tools/testing/selftests/kvm/steal_time_change_pid.c
++++ b/tools/testing/selftests/kvm/steal_time_change_pid.c
+@@ -46,6 +46,60 @@ static void steal_time_enable(struct kvm_vcpu *vcpu)
+ 		     (ulong)st_gva | KVM_MSR_ENABLED);
+ }
+ 
++#elif defined(__aarch64__)
++
++#define STEAL_TIME_SIZE	((sizeof(struct st_time) + 63) & ~63)
++
++#define PV_TIME_ST	0xc5000021
++
++struct st_time {
++	u32 rev;
++	u32 attr;
++	u64 st_time;
++};
++
++static void guest_code(void)
++{
++	struct arm_smccc_res res;
++	struct st_time *st;
++
++	do_smccc(PV_TIME_ST, 0, 0, 0, 0, 0, 0, 0, &res);
++	GUEST_ASSERT_NE(res.a0, -1);
++	GUEST_ASSERT_EQ(res.a0, (ulong)st_gva);
++
++	st = (struct st_time *)res.a0;
++	WRITE_ONCE(guest_stolen_time, READ_ONCE(st->st_time));
++	GUEST_SYNC(0);
++
++	WRITE_ONCE(guest_stolen_time, READ_ONCE(st->st_time));
++	GUEST_SYNC(1);
++
++	WRITE_ONCE(guest_stolen_time, READ_ONCE(st->st_time));
++	GUEST_DONE();
++}
++
++static bool steal_time_supported(struct kvm_vcpu *vcpu)
++{
++	struct kvm_device_attr dev = {
++		.group = KVM_ARM_VCPU_PVTIME_CTRL,
++		.attr = KVM_ARM_VCPU_PVTIME_IPA,
++	};
++
++	return !__vcpu_ioctl(vcpu, KVM_HAS_DEVICE_ATTR, &dev);
++}
++
++static void steal_time_enable(struct kvm_vcpu *vcpu)
++{
++	u64 st_ipa = (ulong)st_gva;
++	struct kvm_device_attr dev = {
++		.group = KVM_ARM_VCPU_PVTIME_CTRL,
++		.attr = KVM_ARM_VCPU_PVTIME_IPA,
++		.addr = (u64)&st_ipa,
++	};
++
++	vcpu_ioctl(vcpu, KVM_SET_DEVICE_ATTR, &dev);
++}
++
+ #else
+ #error "steal_time_change_pid is not implemented on this architecture"
+ #endif
+-- 
+2.43.5
+
